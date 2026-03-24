@@ -16,7 +16,38 @@ services:
       retries: 5
       start_period: 30s
 
+  # ── Backend API ─────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-homemall}?schema=public
+      JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${APP_ORIGIN}
+      COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
+      EXTERNAL_INGESTION_ENABLED: ${EXTERNAL_INGESTION_ENABLED:-false}
+      EXTERNAL_INGESTION_INTERVAL_MINUTES: ${EXTERNAL_INGESTION_INTERVAL_MINUTES:-360}
+      EXTERNAL_INGESTION_MAX_ROWS: ${EXTERNAL_INGESTION_MAX_ROWS:-120}
+      EXTERNAL_INGESTION_DEACTIVATE_MISSING: ${EXTERNAL_INGESTION_DEACTIVATE_MISSING:-true}
+    volumes:
+      - homemall_uploads_prod:/workspace/apps/api/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   # ── Migrations & Seed (run-once init container) ─────────────
+  # Shares the same build as api — Docker/Coolify deduplicates the layers.
   # Excluded from Coolify health checks — exits after completion.
   migrate:
     build:
@@ -45,38 +76,6 @@ services:
     labels:
       - coolify.exclude_from_hc=true
 
-  # ── Backend API ─────────────────────────────────────────────
-  api:
-    build:
-      context: .
-      dockerfile: docker/api.Dockerfile
-    restart: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    environment:
-      NODE_ENV: production
-      PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-homemall}?schema=public
-      JWT_SECRET: ${SERVICE_PASSWORD_JWT}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      CORS_ORIGIN: ${APP_ORIGIN}
-      COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
-      EXTERNAL_INGESTION_ENABLED: ${EXTERNAL_INGESTION_ENABLED:-false}
-      EXTERNAL_INGESTION_INTERVAL_MINUTES: ${EXTERNAL_INGESTION_INTERVAL_MINUTES:-360}
-      EXTERNAL_INGESTION_MAX_ROWS: ${EXTERNAL_INGESTION_MAX_ROWS:-120}
-      EXTERNAL_INGESTION_DEACTIVATE_MISSING: ${EXTERNAL_INGESTION_DEACTIVATE_MISSING:-true}
-    volumes:
-      - homemall_uploads_prod:/workspace/apps/api/uploads
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
   # ── Frontend Web (Coolify routes traffic here) ──────────────
   # Assign your domain to this service in Coolify's UI on port 3000.
   # Next.js rewrites proxy /api/* and /uploads/* to the api service
@@ -89,6 +88,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     expose:
       - "3000"
     environment:
