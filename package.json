@@ -1,0 +1,21 @@
+{
+  "name": "homemall",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "predev": "corepack pnpm --filter @homemall/shared build && corepack pnpm --filter @homemall/scoring build",
+    "prelint": "corepack pnpm --filter @homemall/shared build && corepack pnpm --filter @homemall/scoring build",
+    "dev": "corepack pnpm -r --parallel --filter @homemall/api --filter @homemall/web dev",
+    "build": "corepack pnpm -r --filter @homemall/shared --filter @homemall/scoring --filter @homemall/api --filter @homemall/web build",
+    "lint": "corepack pnpm -r --filter @homemall/shared --filter @homemall/scoring --filter @homemall/api --filter @homemall/web lint",
+    "format": "corepack pnpm -r --filter @homemall/api --filter @homemall/web format",
+    "share:up": "docker compose --env-file .env.share -f docker-compose.share.yml up -d --build",
+    "share:down": "docker compose --env-file .env.share -f docker-compose.share.yml down",
+    "share:migrate": "docker compose --env-file .env.share -f docker-compose.share.yml exec api pnpm --filter @homemall/api prisma:deploy",
+    "share:seed": "docker compose --env-file .env.share -f docker-compose.share.yml exec api pnpm --filter @homemall/api prisma:seed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "typescript": "^5.6.3"
+  }
+}

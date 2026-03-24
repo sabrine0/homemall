@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  SUPER_ADMIN
+  MANAGER
+}
+
+enum AdminPermission {
+  MANAGE_USERS
+  MANAGE_LISTINGS
+  MODERATE_REPORTS
+  MANAGE_IMPORTS
+  MANAGE_SETTINGS
+  MANAGE_ADMINS
+}
+
+enum ListingType {
+  APARTMENT
+  HOUSE
+  STUDIO
+  VILLA
+  LAND
+}
+
+enum ListingPurpose {
+  RENT
+  BUY
+}
+
+enum ListingStatus {
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum ListingSourcePlatform {
+  MANUAL
+  AVITO
+  MUBAWAB
+  OTHER
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  passwordHash    String
+  displayName     String?
+  avatarUrl       String?
+  contactPhone    String?
+  contactWhatsApp String?
+  contactInstagram String?
+  contactFacebook String?
+  contactWebsite  String?
+  passwordResetCodeHash String?
+  passwordResetExpiresAt DateTime?
+  isActive        Boolean          @default(true)
+  role            UserRole         @default(USER)
+  adminPermissions AdminPermission[] @default([])
+  createdAt       DateTime         @default(now())
+  profile         UserProfile?
+  analysisResults AnalysisResult[]
+  listings        UserListing[]
+  listingReports  ListingReport[]
+  sellerChats     ChatConversation[] @relation("SellerConversations")
+  buyerChats      ChatConversation[] @relation("BuyerConversations")
+  chatMessages    ChatMessage[]
+  updatedSystemSettings SystemSetting[] @relation("SystemSettingUpdater")
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal          String
+  budgetMin     Int
+  budgetMax     Int
+  workLat       Float
+  workLng       Float
+  mobilityModes Json
+  sensitivities Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Zone {
+  id              String           @id @default(cuid())
+  name            String
+  city            String
+  centerLat       Float
+  centerLng       Float
+  metaJson        Json
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  metrics         ZoneMetrics?
+  analysisResults AnalysisResult[]
+  listings        UserListing[]
+}
+
+model ZoneMetrics {
+  id               String @id @default(cuid())
+  zoneId           String @unique
+  zone             Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  noiseIndex       Float
+  greenIndex       Float
+  airQualityIndex  Float
+  pollenIndex      Float
+  floodRiskIndex   Float
+  heatIndex        Float
+  transitIndex     Float
+  walkIndex        Float
+  futureValueIndex Float
+  zoningRiskIndex  Float
+}
+
+model AnalysisResult {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zoneId    String
+  zone      Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  scoreJson Json
+  tclJson   Json
+  createdAt DateTime @default(now())
+}
+
+model UserListing {
+  id           String          @id @default(cuid())
+  sellerId     String
+  seller       User            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  zoneId       String
+  zone         Zone            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  type         ListingType
+  purpose      ListingPurpose
+  status       ListingStatus   @default(ACTIVE)
+  sourcePlatform ListingSourcePlatform @default(MANUAL)
+  sourceName    String?
+  sourceUrl     String?
+  sourceListingId String?
+  externalReference Json?
+  importedAt    DateTime?
+  lastSeenAt    DateTime?
+  isExternal    Boolean         @default(false)
+  priceMonthly Float?
+  priceSale    Float?
+  areaM2       Float?
+  bedrooms     Int?
+  bathrooms    Int?
+  imageUrls    Json
+  contactPhone String?
+  contactEmail String?
+  contactWhatsApp String?
+  contactInstagram String?
+  contactFacebook String?
+  contactWebsite String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  chats        ChatConversation[]
+  reports      ListingReport[]
+
+  @@index([zoneId, status, purpose])
+  @@index([sellerId, createdAt])
+  @@index([isExternal, lastSeenAt])
+  @@unique([sourcePlatform, sourceListingId])
+}
+
+model ListingReport {
+  id         String      @id @default(cuid())
+  listingId  String
+  listing    UserListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User        @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([listingId, reporterId])
+  @@index([createdAt])
+  @@index([listingId, createdAt])
+}
+
+model ChatConversation {
+  id        String        @id @default(cuid())
+  listingId String
+  listing   UserListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  sellerId  String
+  seller    User          @relation("SellerConversations", fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User          @relation("BuyerConversations", fields: [buyerId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+
+  @@unique([listingId, buyerId])
+  @@index([sellerId, updatedAt])
+  @@index([buyerId, updatedAt])
+}
+
+model ChatMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User             @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text           String
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  valueJson   Json
+  description String?
+  updatedById String?
+  updatedBy   User?    @relation("SystemSettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedById])
+}

@@ -1,0 +1,79 @@
+{
+  "info": {
+    "name": "HomeMall API",
+    "_postman_id": "9d8de9bb-02cb-46ed-b15b-03d8049e8347",
+    "description": "Collection for HomeMall auth, profile, zones, analysis, and reports.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo@homemall.com\",\n  \"password\": \"Password123\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/signup"
+      }
+    },
+    {
+      "name": "Auth Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"demo@homemall.com\",\n  \"password\": \"Password123\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "Get Profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/profile"
+      }
+    },
+    {
+      "name": "List Zones",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": "{{baseUrl}}/api/zones"
+      }
+    },
+    {
+      "name": "Analyze TCL",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"profile\": {\n    \"goal\": \"rent\",\n    \"budgetMin\": 900,\n    \"budgetMax\": 2200,\n    \"workLat\": 33.5731,\n    \"workLng\": -7.5898,\n    \"mobilityModes\": [\"transit\", \"walk\"],\n    \"sensitivities\": {\n      \"noise\": 2,\n      \"heat\": 2,\n      \"allergies\": 3\n    }\n  },\n  \"optionA\": {\n    \"label\": \"Option A\",\n    \"zoneId\": \"{{zoneIdA}}\",\n    \"housingCostMonthly\": 1200,\n    \"commuteKmMonthly\": 380,\n    \"energyKwhMonthly\": 240,\n    \"baselineHealthBudget\": 70\n  },\n  \"optionB\": {\n    \"label\": \"Option B\",\n    \"zoneId\": \"{{zoneIdB}}\",\n    \"housingCostMonthly\": 1350,\n    \"commuteKmMonthly\": 440,\n    \"energyKwhMonthly\": 260,\n    \"baselineHealthBudget\": 90\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/analyze/tcl"
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" },
+    { "key": "zoneIdA", "value": "" },
+    { "key": "zoneIdB", "value": "" }
+  ]
+}

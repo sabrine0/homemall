@@ -1,0 +1,16 @@
+.git
+.next
+.pnpm-store
+node_modules
+dist
+coverage
+test-results
+tmp
+.runlogs
+*.log
+*.out
+*.err
+apps/api/dist
+apps/api/uploads
+apps/web/.next
+apps/mobile/build
