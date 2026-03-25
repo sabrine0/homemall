@@ -5,7 +5,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-homemall}
     volumes:
       - homemall_pgdata_prod:/var/lib/postgresql/data
@@ -28,10 +28,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-homemall}?schema=public}
-      JWT_SECRET: ${SERVICE_PASSWORD_JWT}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES:-postgres}@postgres:5432/${POSTGRES_DB:-homemall}?schema=public}
+      JWT_SECRET: ${SERVICE_PASSWORD_JWT:-homemall-production-jwt-secret}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      CORS_ORIGIN: ${APP_ORIGIN}
+      CORS_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
       COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
       EXTERNAL_INGESTION_ENABLED: ${EXTERNAL_INGESTION_ENABLED:-false}
       EXTERNAL_INGESTION_INTERVAL_MINUTES: ${EXTERNAL_INGESTION_INTERVAL_MINUTES:-360}
@@ -68,7 +68,7 @@ services:
         echo "Seed complete."
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-homemall}?schema=public}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${SERVICE_PASSWORD_POSTGRES:-postgres}@postgres:5432/${POSTGRES_DB:-homemall}?schema=public}
       SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@homemall.local}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-Admin12345!}
       MANAGER_EMAIL: ${MANAGER_EMAIL}
