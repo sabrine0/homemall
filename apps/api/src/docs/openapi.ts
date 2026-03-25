@@ -7,8 +7,8 @@ export const openApiSpec = {
   },
   servers: [
     {
-      url: "http://localhost:4000",
-      description: "Local"
+      url: "/",
+      description: "Current origin"
     }
   ],
   components: {
