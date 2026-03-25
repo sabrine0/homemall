@@ -7,7 +7,6 @@ import {
   InfoWindowF,
   MarkerClustererF,
   MarkerF,
-  PolygonF,
   useJsApiLoader,
 } from "@react-google-maps/api";
 import type {
@@ -22,10 +21,6 @@ import { getLocalizedCityName, getLocalizedZoneName } from "@/lib/location-label
 import {
   MOROCCO_BOUNDS,
   MOROCCO_CENTER,
-  MOROCCO_MAP_MASK_FILL,
-  MOROCCO_MAP_OUTLINE,
-  MOROCCO_OUTLINE_PATH,
-  WORLD_MASK_PATH,
 } from "./morocco-map-geometry";
 import type { LeafletMarkerModel } from "./zones-map-leaflet";
 
@@ -472,7 +467,7 @@ export function ZonesMap({
           setOpenPopupZoneId(null);
         }}
         options={{
-          minZoom: 6,
+          minZoom: 5,
           gestureHandling: "greedy",
           mapTypeControl: false,
           streetViewControl: false,
@@ -480,31 +475,10 @@ export function ZonesMap({
           styles: MAP_POLITICAL_HIDE_STYLES,
           restriction: {
             latLngBounds: MOROCCO_BOUNDS,
-            strictBounds: true,
+            strictBounds: false,
           },
         }}
       >
-        <PolygonF
-          paths={[WORLD_MASK_PATH, [...MOROCCO_OUTLINE_PATH].reverse()]}
-          options={{
-            fillColor: MOROCCO_MAP_MASK_FILL,
-            fillOpacity: 0.92,
-            strokeOpacity: 0,
-            clickable: false,
-            zIndex: 1,
-          }}
-        />
-        <PolygonF
-          paths={MOROCCO_OUTLINE_PATH}
-          options={{
-            fillOpacity: 0,
-            strokeColor: MOROCCO_MAP_OUTLINE,
-            strokeOpacity: 0.8,
-            strokeWeight: 2,
-            clickable: false,
-            zIndex: 2,
-          }}
-        />
         <MarkerClustererF
           options={{
             maxZoom: 14,
