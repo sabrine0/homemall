@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import {
   CircleMarker,
   MapContainer,
+  Polygon,
   Popup,
   TileLayer,
   Tooltip,
@@ -11,7 +12,12 @@ import {
 } from "react-leaflet";
 import type { ZoneSummary } from "@homemall/shared";
 import L from "leaflet";
-import { MOROCCO_BOUNDS, MOROCCO_CENTER } from "./morocco-map-geometry";
+import {
+  MOROCCO_BOUNDS,
+  MOROCCO_CENTER,
+  MOROCCO_MAP_OUTLINE,
+  MOROCCO_OUTLINE_PATH,
+} from "./morocco-map-geometry";
 
 type MarkerTier = "best" | "medium" | "worst";
 
@@ -89,11 +95,7 @@ function MapViewportController({
     }
 
     if (!markerModels.length) {
-      map.fitBounds(moroccoBounds, {
-        animate: false,
-        maxZoom: 6,
-        padding: [24, 24],
-      });
+      map.fitBounds(moroccoBounds, { padding: [24, 24] });
       return;
     }
 
@@ -136,14 +138,23 @@ export function ZonesMapLeaflet({
       ),
     [],
   );
+  const moroccoOutline = useMemo(
+    () =>
+      MOROCCO_OUTLINE_PATH.map(
+        ({ lat, lng }) => [lat, lng] as L.LatLngTuple,
+      ),
+    [],
+  );
   return (
     <div className="h-[52vh] min-h-[340px] w-full overflow-hidden rounded-3xl border border-brand-200 bg-[#edf3f0] shadow-panel">
       <MapContainer
+        bounds={mapBounds}
+        boundsOptions={{ padding: [24, 24] }}
         center={[MOROCCO_CENTER.lat, MOROCCO_CENTER.lng]}
         zoom={6}
-        minZoom={5}
+        minZoom={6}
         maxBounds={mapBounds}
-        maxBoundsViscosity={0.85}
+        maxBoundsViscosity={1}
         worldCopyJump={false}
         zoomSnap={0.25}
         scrollWheelZoom
@@ -153,6 +164,16 @@ export function ZonesMapLeaflet({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           noWrap
+        />
+        <Polygon
+          positions={moroccoOutline}
+          pathOptions={{
+            color: MOROCCO_MAP_OUTLINE,
+            weight: 2,
+            opacity: 0.8,
+            fill: false,
+          }}
+          interactive={false}
         />
         <MapViewportController
           markerModels={markerModels}
