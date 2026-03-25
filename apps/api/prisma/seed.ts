@@ -30,6 +30,19 @@ const MOROCCO_CITY_CENTERS: CityCenterSeed[] = [
 const clamp = (value: number, min = 0, max = 100) =>
   Math.max(min, Math.min(max, value));
 
+const envFlagEnabled = (value: string | undefined, fallback: boolean) => {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+
+  return ["1", "true", "yes", "on"].includes(normalized);
+};
+
 const buildMetrics = (index: number) => ({
   noiseIndex: clamp(38 + ((index * 7) % 28)),
   greenIndex: clamp(44 + ((index * 11) % 34)),
@@ -44,41 +57,28 @@ const buildMetrics = (index: number) => ({
 });
 
 const main = async () => {
-  await prisma.chatMessage.deleteMany();
-  await prisma.chatConversation.deleteMany();
-  await prisma.listingReport.deleteMany();
-  await prisma.userListing.deleteMany();
-  await prisma.analysisResult.deleteMany();
-  await prisma.userProfile.deleteMany();
-  await prisma.zoneMetrics.deleteMany();
-  await prisma.zone.deleteMany();
-  await prisma.systemSetting.deleteMany();
-  await prisma.user.deleteMany();
-
-  for (const [index, city] of MOROCCO_CITY_CENTERS.entries()) {
-    await prisma.zone.create({
-      data: {
-        name: `${city.city} City Center`,
-        city: city.city,
-        centerLat: city.centerLat,
-        centerLng: city.centerLng,
-        metaJson: {},
-        metrics: {
-          create: buildMetrics(index)
-        }
-      }
-    });
-  }
+  const shouldSeedDemoZones = envFlagEnabled(
+    process.env.SEED_DEMO_ZONES,
+    process.env.NODE_ENV !== "production"
+  );
 
   const superAdminEmail = process.env.SUPER_ADMIN_EMAIL ?? "admin@homemall.local";
   const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD ?? "Admin12345!";
   const superAdminHash = await bcrypt.hash(superAdminPassword, 10);
 
-  await prisma.user.create({
+  await prisma.user.upsert({
+    where: {
+      email: superAdminEmail
+    },
     data: {
       email: superAdminEmail,
       passwordHash: superAdminHash,
       role: "SUPER_ADMIN"
+    },
+    update: {
+      passwordHash: superAdminHash,
+      role: "SUPER_ADMIN",
+      isActive: true
     }
   });
 
@@ -86,17 +86,79 @@ const main = async () => {
   const managerPassword = process.env.MANAGER_PASSWORD?.trim();
   if (managerEmail && managerPassword) {
     const managerHash = await bcrypt.hash(managerPassword, 10);
-    await prisma.user.create({
+    await prisma.user.upsert({
+      where: {
+        email: managerEmail
+      },
       data: {
         email: managerEmail,
         passwordHash: managerHash,
         role: "MANAGER"
+      },
+      update: {
+        passwordHash: managerHash,
+        role: "MANAGER",
+        isActive: true
       }
     });
   }
 
+  let createdZones = 0;
+  let updatedZones = 0;
+
+  if (shouldSeedDemoZones) {
+    for (const [index, city] of MOROCCO_CITY_CENTERS.entries()) {
+      const zoneName = `${city.city} City Center`;
+      const metricsData = buildMetrics(index);
+      const existingZone = await prisma.zone.findFirst({
+        where: {
+          name: zoneName,
+          city: city.city
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (!existingZone) {
+        await prisma.zone.create({
+          data: {
+            name: zoneName,
+            city: city.city,
+            centerLat: city.centerLat,
+            centerLng: city.centerLng,
+            metaJson: {},
+            metrics: {
+              create: metricsData
+            }
+          }
+        });
+        createdZones += 1;
+        continue;
+      }
+
+      await prisma.zone.update({
+        where: {
+          id: existingZone.id
+        },
+        data: {
+          centerLat: city.centerLat,
+          centerLng: city.centerLng,
+          metaJson: {},
+          metrics: {
+            upsert: {
+              create: metricsData,
+              update: metricsData
+            }
+          }
+        }
+      });
+      updatedZones += 1;
+    }
+  }
+
   console.log(
-    `Seed complete. Inserted ${MOROCCO_CITY_CENTERS.length} zones, 0 listings, and default super admin ${superAdminEmail}.`
+    `Seed complete. Demo zones ${shouldSeedDemoZones ? `created ${createdZones}, updated ${updatedZones}` : "skipped"}, default super admin ${superAdminEmail}.`
   );
 };
 

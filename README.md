@@ -77,6 +77,8 @@ pnpm --filter @homemall/api prisma:migrate
 pnpm --filter @homemall/api prisma:seed
 ```
 
+`SEED_DEMO_ZONES=true` seeds the sample Morocco zones. Keep it unset or set it to `false` in production.
+
 4. Start web + API dev servers:
 
 ```bash

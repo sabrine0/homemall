@@ -26,6 +26,7 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       CORS_ORIGIN: ${APP_ORIGIN:-http://localhost}
       COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
+      SEED_DEMO_ZONES: ${SEED_DEMO_ZONES:-true}
     volumes:
       - homemall_uploads_share:/workspace/apps/api/uploads
 

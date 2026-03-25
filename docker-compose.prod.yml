@@ -73,6 +73,7 @@ services:
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-Admin12345!}
       MANAGER_EMAIL: ${MANAGER_EMAIL}
       MANAGER_PASSWORD: ${MANAGER_PASSWORD}
+      SEED_DEMO_ZONES: ${SEED_DEMO_ZONES:-false}
     labels:
       - coolify.exclude_from_hc=true
 
