@@ -84,6 +84,11 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        API_SERVER_URL: http://api:4000
+        NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
     restart: always
     depends_on:
       api:

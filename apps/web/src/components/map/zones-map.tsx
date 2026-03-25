@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   GoogleMap,
@@ -17,6 +18,7 @@ import type {
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { getScoreRange, getScoreTierInfo } from "@/lib/score-tier";
 import { getLocalizedCityName, getLocalizedZoneName } from "@/lib/location-labels";
+import type { LeafletMarkerModel } from "./zones-map-leaflet";
 
 interface ZonesMapProps {
   zones: ZoneSummary[];
@@ -45,6 +47,19 @@ type MarkerModel = {
   popupTitle: string;
   highlightedPrice?: number;
 };
+
+const LeafletZonesMap = dynamic(
+  () =>
+    import("./zones-map-leaflet").then((module) => module.ZonesMapLeaflet),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[52vh] min-h-[340px] w-full items-center justify-center rounded-3xl border border-brand-200 bg-[#edf3f0] px-6 text-sm text-slate-600 shadow-panel">
+        Loading map...
+      </div>
+    ),
+  },
+);
 
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
 
@@ -394,20 +409,28 @@ export function ZonesMap({
     ? { lat: zones[0].centerLat, lng: zones[0].centerLng }
     : listCenter;
 
-  if (!googleMapsApiKey) {
+  if (!googleMapsApiKey || loadError) {
     return (
-      <div className="flex h-[52vh] min-h-[340px] w-full items-center justify-center rounded-3xl border border-brand-200 bg-[#edf3f0] px-6 text-sm text-slate-600 shadow-panel">
-        Set <code className="mx-1">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in the
-        web app environment to load Google Maps.
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex h-[52vh] min-h-[340px] w-full items-center justify-center rounded-3xl border border-brand-200 bg-[#edf3f0] px-6 text-sm text-slate-600 shadow-panel">
-        Failed to load Google Maps.
-      </div>
+      <LeafletZonesMap
+        markerModels={markerModels as LeafletMarkerModel[]}
+        selectedZoneId={selectedZoneId}
+        locale={locale}
+        purposeLabel={
+          purpose === "rent"
+            ? t("listing.rent")
+            : purpose === "buy"
+              ? t("listing.sale")
+              : t("listing.total")
+        }
+        scoreLabel={t("common.score")}
+        tierLabels={{
+          best: t("tier.best"),
+          medium: t("tier.medium"),
+          worst: t("tier.worst"),
+        }}
+        listingTypeLabel={(type) => t(`listing.${type}` as never)}
+        onSelectZone={onSelectZone}
+      />
     );
   }
 
