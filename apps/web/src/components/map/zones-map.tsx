@@ -7,6 +7,7 @@ import {
   InfoWindowF,
   MarkerClustererF,
   MarkerF,
+  PolygonF,
   useJsApiLoader,
 } from "@react-google-maps/api";
 import type {
@@ -18,6 +19,14 @@ import type {
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { getScoreRange, getScoreTierInfo } from "@/lib/score-tier";
 import { getLocalizedCityName, getLocalizedZoneName } from "@/lib/location-labels";
+import {
+  MOROCCO_BOUNDS,
+  MOROCCO_CENTER,
+  MOROCCO_MAP_MASK_FILL,
+  MOROCCO_MAP_OUTLINE,
+  MOROCCO_OUTLINE_PATH,
+  WORLD_MASK_PATH,
+} from "./morocco-map-geometry";
 import type { LeafletMarkerModel } from "./zones-map-leaflet";
 
 interface ZonesMapProps {
@@ -62,15 +71,6 @@ const LeafletZonesMap = dynamic(
 );
 
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
-
-const MOROCCO_BOUNDS = {
-  north: 36.2,
-  south: 20.5,
-  west: -17.5,
-  east: -0.8,
-};
-
-const listCenter = { lat: 33.5731, lng: -7.5898 };
 
 const listingTypeKeys: ListingKind[] = [
   "apartment",
@@ -400,8 +400,11 @@ export function ZonesMap({
 
     if (markerModels.length === 1) {
       const zone = markerModels[0].zone;
-      map.setCenter({ lat: zone.centerLat, lng: zone.centerLng });
-      map.setZoom(11);
+      const singleZoneBounds = new gmaps.maps.LatLngBounds();
+      singleZoneBounds.extend({ lat: zone.centerLat - 0.6, lng: zone.centerLng - 0.8 });
+      singleZoneBounds.extend({ lat: zone.centerLat + 0.6, lng: zone.centerLng + 0.8 });
+      map.fitBounds(singleZoneBounds, 36);
+      map.setZoom(Math.min(map.getZoom() ?? 11, 10));
       return;
     }
 
@@ -409,7 +412,7 @@ export function ZonesMap({
     markerModels.forEach((item) => {
       bounds.extend({ lat: item.zone.centerLat, lng: item.zone.centerLng });
     });
-    map.fitBounds(bounds, 48);
+    map.fitBounds(bounds, 36);
   }, [isLoaded, markerModels]);
 
   const markerByZoneId = useMemo(
@@ -419,10 +422,6 @@ export function ZonesMap({
   const openPopupMarker = openPopupZoneId
     ? markerByZoneId.get(openPopupZoneId)
     : undefined;
-
-  const mapCenter = zones.length
-    ? { lat: zones[0].centerLat, lng: zones[0].centerLng }
-    : listCenter;
 
   if (!googleMapsApiKey || loadError) {
     return (
@@ -461,7 +460,7 @@ export function ZonesMap({
     <div className="h-[52vh] min-h-[340px] w-full overflow-hidden rounded-3xl border border-brand-200 bg-[#edf3f0] shadow-panel">
       <GoogleMap
         mapContainerStyle={MAP_CONTAINER_STYLE}
-        center={mapCenter}
+        center={MOROCCO_CENTER}
         zoom={6}
         onLoad={(map) => {
           mapRef.current = map;
@@ -473,7 +472,7 @@ export function ZonesMap({
           setOpenPopupZoneId(null);
         }}
         options={{
-          minZoom: 5,
+          minZoom: 6,
           gestureHandling: "greedy",
           mapTypeControl: false,
           streetViewControl: false,
@@ -481,10 +480,31 @@ export function ZonesMap({
           styles: MAP_POLITICAL_HIDE_STYLES,
           restriction: {
             latLngBounds: MOROCCO_BOUNDS,
-            strictBounds: false,
+            strictBounds: true,
           },
         }}
       >
+        <PolygonF
+          paths={[WORLD_MASK_PATH, [...MOROCCO_OUTLINE_PATH].reverse()]}
+          options={{
+            fillColor: MOROCCO_MAP_MASK_FILL,
+            fillOpacity: 0.92,
+            strokeOpacity: 0,
+            clickable: false,
+            zIndex: 1,
+          }}
+        />
+        <PolygonF
+          paths={MOROCCO_OUTLINE_PATH}
+          options={{
+            fillOpacity: 0,
+            strokeColor: MOROCCO_MAP_OUTLINE,
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            clickable: false,
+            zIndex: 2,
+          }}
+        />
         <MarkerClustererF
           options={{
             maxZoom: 14,

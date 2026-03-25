@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   CircleMarker,
   MapContainer,
+  Polygon,
   Popup,
   TileLayer,
   Tooltip,
@@ -11,6 +12,14 @@ import {
 } from "react-leaflet";
 import type { ZoneSummary } from "@homemall/shared";
 import L from "leaflet";
+import {
+  MOROCCO_BOUNDS,
+  MOROCCO_CENTER,
+  MOROCCO_MAP_MASK_FILL,
+  MOROCCO_MAP_OUTLINE,
+  MOROCCO_OUTLINE_PATH,
+  WORLD_MASK_PATH,
+} from "./morocco-map-geometry";
 
 type MarkerTier = "best" | "medium" | "worst";
 
@@ -42,13 +51,6 @@ interface ZonesMapLeafletProps {
   onSelectZone?: (zone: ZoneSummary) => void;
 }
 
-const MOROCCO_BOUNDS = L.latLngBounds(
-  L.latLng(20.5, -17.5),
-  L.latLng(36.2, -0.8),
-);
-
-const listCenter: [number, number] = [33.5731, -7.5898];
-
 const propertyTypeToBadge: Record<string, string> = {
   house: "H",
   apartment: "A",
@@ -68,6 +70,14 @@ function MapViewportController({
   selectedZoneId,
 }: Pick<ZonesMapLeafletProps, "markerModels" | "selectedZoneId">) {
   const map = useMap();
+  const moroccoBounds = useMemo(
+    () =>
+      L.latLngBounds(
+        L.latLng(MOROCCO_BOUNDS.south, MOROCCO_BOUNDS.west),
+        L.latLng(MOROCCO_BOUNDS.north, MOROCCO_BOUNDS.east),
+      ),
+    [],
+  );
 
   useEffect(() => {
     const selectedMarker = selectedZoneId
@@ -75,16 +85,19 @@ function MapViewportController({
       : undefined;
 
     if (selectedMarker) {
-      map.setView(
-        [selectedMarker.zone.centerLat, selectedMarker.zone.centerLng],
-        11,
-        { animate: false },
+      const focusBounds = L.latLngBounds(
+        [
+          [selectedMarker.zone.centerLat - 0.6, selectedMarker.zone.centerLng - 0.8],
+          [selectedMarker.zone.centerLat + 0.6, selectedMarker.zone.centerLng + 0.8],
+        ],
       );
+      map.fitBounds(focusBounds, { animate: false, padding: [24, 24] });
+      map.setZoom(Math.min(map.getZoom(), 10));
       return;
     }
 
     if (!markerModels.length) {
-      map.fitBounds(MOROCCO_BOUNDS, { padding: [24, 24] });
+      map.fitBounds(moroccoBounds, { padding: [24, 24] });
       return;
     }
 
@@ -104,7 +117,7 @@ function MapViewportController({
     );
 
     map.fitBounds(bounds, { padding: [24, 24] });
-  }, [map, markerModels, selectedZoneId]);
+  }, [map, markerModels, moroccoBounds, selectedZoneId]);
 
   return null;
 }
@@ -119,12 +132,63 @@ export function ZonesMapLeaflet({
   listingTypeLabel,
   onSelectZone,
 }: ZonesMapLeafletProps) {
+  const mapBounds = useMemo(
+    () =>
+      L.latLngBounds(
+        L.latLng(MOROCCO_BOUNDS.south, MOROCCO_BOUNDS.west),
+        L.latLng(MOROCCO_BOUNDS.north, MOROCCO_BOUNDS.east),
+      ),
+    [],
+  );
+  const moroccoOutline = useMemo(
+    () =>
+      MOROCCO_OUTLINE_PATH.map(
+        ({ lat, lng }) => [lat, lng] as L.LatLngTuple,
+      ),
+    [],
+  );
+  const maskPolygon = useMemo(
+    () => [
+      WORLD_MASK_PATH.map(({ lat, lng }) => [lat, lng] as L.LatLngTuple),
+      [...moroccoOutline].reverse(),
+    ],
+    [moroccoOutline],
+  );
+
   return (
     <div className="h-[52vh] min-h-[340px] w-full overflow-hidden rounded-3xl border border-brand-200 bg-[#edf3f0] shadow-panel">
-      <MapContainer center={listCenter} zoom={6} scrollWheelZoom className="h-full w-full">
+      <MapContainer
+        center={[MOROCCO_CENTER.lat, MOROCCO_CENTER.lng]}
+        zoom={6}
+        minZoom={6}
+        maxBounds={mapBounds}
+        maxBoundsViscosity={1}
+        scrollWheelZoom
+        className="h-full w-full"
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          noWrap
+        />
+        <Polygon
+          positions={maskPolygon}
+          pathOptions={{
+            fillColor: MOROCCO_MAP_MASK_FILL,
+            fillOpacity: 0.92,
+            stroke: false,
+          }}
+          interactive={false}
+        />
+        <Polygon
+          positions={moroccoOutline}
+          pathOptions={{
+            color: MOROCCO_MAP_OUTLINE,
+            weight: 2,
+            opacity: 0.8,
+            fill: false,
+          }}
+          interactive={false}
         />
         <MapViewportController
           markerModels={markerModels}
