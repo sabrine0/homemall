@@ -59,7 +59,7 @@ const purposeLabel = (purpose: ListingPurpose, t: (key: string) => string) =>
   purpose === "rent" ? t("goal.rent") : t("goal.sell");
 
 export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [mine, setMine] = useState<ListingOffer[]>([]);
   const [loadingMine, setLoadingMine] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -134,8 +134,9 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
         selectedZone?.centerLat,
         selectedZone?.centerLng,
         selectedZone ? `${selectedZone.name}, ${selectedZone.city}` : undefined,
+        locale,
       ),
-    [selectedZone],
+    [locale, selectedZone],
   );
 
   useEffect(
@@ -752,6 +753,7 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
                   listing.zoneName && listing.zoneCity
                     ? `${listing.zoneName}, ${listing.zoneCity}`
                     : listing.zoneName,
+                  locale,
                 );
                 return (
                   <article

@@ -122,8 +122,9 @@ export function ZoneDetailsTabs({
         zone.centerLat,
         zone.centerLng,
         `${displayZoneName}, ${displayCity}`,
+        locale,
       ),
-    [displayCity, displayZoneName, zone.centerLat, zone.centerLng],
+    [displayCity, displayZoneName, locale, zone.centerLat, zone.centerLng],
   );
 
   useEffect(() => {
@@ -460,6 +461,7 @@ export function ZoneDetailsTabs({
                 offer.zoneName && offer.zoneCity
                   ? `${offer.zoneName}, ${offer.zoneCity}`
                   : offer.zoneName,
+                locale,
               );
               const priceText =
                 offer.purpose === "rent"

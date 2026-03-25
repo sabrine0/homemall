@@ -76,7 +76,7 @@ export function AgentProfileWorkspace({
   seller: SellerProfile;
   isAuthenticated: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [purposeFilter, setPurposeFilter] = useState<"all" | "rent" | "buy">(
     "all",
@@ -566,6 +566,7 @@ export function AgentProfileWorkspace({
                   listing.zoneName && listing.zoneCity
                     ? `${listing.zoneName}, ${listing.zoneCity}`
                     : listing.zoneName,
+                  locale,
                 );
 
                 return (

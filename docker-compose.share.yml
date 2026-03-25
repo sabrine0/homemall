@@ -33,6 +33,11 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        API_SERVER_URL: http://api:4000
+        NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+        COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
     container_name: homemall-web-share
     restart: unless-stopped
     depends_on:
@@ -43,6 +48,7 @@ services:
       NEXT_PUBLIC_API_URL: /api
       API_SERVER_URL: http://api:4000
       COOKIE_NAME: ${COOKIE_NAME:-homemall_token}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
 
   gateway:
     image: caddy:2-alpine

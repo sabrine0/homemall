@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AdminPermission, UserRole } from "@homemall/shared";
+import { LogoutButton } from "@/components/layout/logout-button";
 
 const navItems: Array<{
   href: string;
@@ -56,9 +57,14 @@ export function AdminShell({
               Backoffice
             </h1>
           </div>
-          <p className="text-sm text-brand-700">
-            {user.email} ({user.role})
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-brand-700">
+              {user.email} ({user.role})
+            </p>
+            <div className="w-[120px]">
+              <LogoutButton redirectTo="/admin/login" className="text-center" />
+            </div>
+          </div>
         </div>
       </header>
 

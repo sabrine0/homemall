@@ -271,6 +271,18 @@ const buildMarkerIcon = ({
 };
 
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+const googleMapsRegion = "MA";
+
+const getGoogleMapsLanguage = (locale: string) => {
+  if (locale === "ar") {
+    return "ar";
+  }
+  if (locale === "fr") {
+    return "fr";
+  }
+  return "en";
+};
+
 const MAP_POLITICAL_HIDE_STYLES = [
   {
     featureType: "administrative",
@@ -298,14 +310,17 @@ export function ZonesMap({
 }: ZonesMapProps) {
   const { t, locale } = useI18n();
   const purpose = activePurpose(activeGoal);
+  const googleMapsLanguage = getGoogleMapsLanguage(locale);
   const mapRef = useRef<any>(null);
   const [openPopupZoneId, setOpenPopupZoneId] = useState<string | null>(
     selectedZoneId ?? null,
   );
 
   const { isLoaded, loadError } = useJsApiLoader({
-    id: "homemall-google-maps",
+    id: `homemall-google-maps-${googleMapsLanguage}`,
     googleMapsApiKey,
+    language: googleMapsLanguage,
+    region: googleMapsRegion,
   });
 
   useEffect(() => {
