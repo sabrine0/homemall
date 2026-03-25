@@ -397,8 +397,8 @@ export function ZonesMap({
   if (!googleMapsApiKey) {
     return (
       <div className="flex h-[52vh] min-h-[340px] w-full items-center justify-center rounded-3xl border border-brand-200 bg-[#edf3f0] px-6 text-sm text-slate-600 shadow-panel">
-        Set <code className="mx-1">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in
-        <code className="mx-1">apps/web/.env.local</code> to load Google Maps.
+        Set <code className="mx-1">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in the
+        web app environment to load Google Maps.
       </div>
     );
   }
