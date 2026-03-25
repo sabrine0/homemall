@@ -15,10 +15,8 @@ import L from "leaflet";
 import {
   MOROCCO_BOUNDS,
   MOROCCO_CENTER,
-  MOROCCO_MAP_MASK_FILL,
   MOROCCO_MAP_OUTLINE,
   MOROCCO_OUTLINE_PATH,
-  WORLD_MASK_PATH,
 } from "./morocco-map-geometry";
 
 type MarkerTier = "best" | "medium" | "worst";
@@ -147,22 +145,18 @@ export function ZonesMapLeaflet({
       ),
     [],
   );
-  const maskPolygon = useMemo(
-    () => [
-      WORLD_MASK_PATH.map(({ lat, lng }) => [lat, lng] as L.LatLngTuple),
-      [...moroccoOutline].reverse(),
-    ],
-    [moroccoOutline],
-  );
-
   return (
     <div className="h-[52vh] min-h-[340px] w-full overflow-hidden rounded-3xl border border-brand-200 bg-[#edf3f0] shadow-panel">
       <MapContainer
+        bounds={mapBounds}
+        boundsOptions={{ padding: [24, 24] }}
         center={[MOROCCO_CENTER.lat, MOROCCO_CENTER.lng]}
         zoom={6}
         minZoom={6}
         maxBounds={mapBounds}
         maxBoundsViscosity={1}
+        worldCopyJump={false}
+        zoomSnap={0.25}
         scrollWheelZoom
         className="h-full w-full"
       >
@@ -170,15 +164,6 @@ export function ZonesMapLeaflet({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           noWrap
-        />
-        <Polygon
-          positions={maskPolygon}
-          pathOptions={{
-            fillColor: MOROCCO_MAP_MASK_FILL,
-            fillOpacity: 0.92,
-            stroke: false,
-          }}
-          interactive={false}
         />
         <Polygon
           positions={moroccoOutline}
