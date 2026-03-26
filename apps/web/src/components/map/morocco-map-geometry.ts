@@ -14,6 +14,7 @@ export const MOROCCO_CENTER: MapLatLng = { lat: 31.7917, lng: -7.0926 };
 
 export const MOROCCO_MAP_MASK_FILL = "#edf3f0";
 export const MOROCCO_MAP_OUTLINE = "#8fb7a0";
+export const MOROCCO_SOUTH_REGION_MASK_FILL = "#f3eee0";
 
 // Rough outline used to visually isolate Morocco on both Google Maps and Leaflet.
 // It is intentionally simplified for UI masking rather than cartographic precision.
@@ -56,4 +57,11 @@ export const WORLD_MASK_PATH: MapLatLng[] = [
   { lat: 85, lng: 179.9 },
   { lat: -85, lng: 179.9 },
   { lat: -85, lng: -179.9 },
+];
+
+export const MOROCCO_SOUTH_REGION_MASK_PATH: MapLatLng[] = [
+  { lat: 28.65, lng: -17.5 },
+  { lat: 28.65, lng: -8.1 },
+  { lat: 20.5, lng: -8.1 },
+  { lat: 20.5, lng: -17.5 },
 ];

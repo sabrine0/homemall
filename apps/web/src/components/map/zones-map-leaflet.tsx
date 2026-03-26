@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import {
   CircleMarker,
   MapContainer,
+  Polygon,
   Popup,
   TileLayer,
   Tooltip,
@@ -14,6 +15,8 @@ import L from "leaflet";
 import {
   MOROCCO_BOUNDS,
   MOROCCO_CENTER,
+  MOROCCO_SOUTH_REGION_MASK_FILL,
+  MOROCCO_SOUTH_REGION_MASK_PATH,
 } from "./morocco-map-geometry";
 
 type MarkerTier = "best" | "medium" | "worst";
@@ -135,6 +138,13 @@ export function ZonesMapLeaflet({
       ),
     [],
   );
+  const southRegionMask = useMemo(
+    () =>
+      MOROCCO_SOUTH_REGION_MASK_PATH.map(
+        ({ lat, lng }) => [lat, lng] as L.LatLngTuple,
+      ),
+    [],
+  );
   return (
     <div className="h-[52vh] min-h-[340px] w-full overflow-hidden rounded-3xl border border-brand-200 bg-[#edf3f0] shadow-panel">
       <MapContainer
@@ -154,6 +164,17 @@ export function ZonesMapLeaflet({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           noWrap
+        />
+        <Polygon
+          positions={southRegionMask}
+          pathOptions={{
+            color: MOROCCO_SOUTH_REGION_MASK_FILL,
+            weight: 0,
+            opacity: 0,
+            fillColor: MOROCCO_SOUTH_REGION_MASK_FILL,
+            fillOpacity: 0.96,
+          }}
+          interactive={false}
         />
         <MapViewportController
           markerModels={markerModels}

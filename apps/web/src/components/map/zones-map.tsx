@@ -24,6 +24,8 @@ import {
   MOROCCO_CENTER,
   MOROCCO_MAP_MASK_FILL,
   MOROCCO_OUTLINE_PATH,
+  MOROCCO_SOUTH_REGION_MASK_FILL,
+  MOROCCO_SOUTH_REGION_MASK_PATH,
   WORLD_MASK_PATH,
 } from "./morocco-map-geometry";
 
@@ -547,6 +549,16 @@ export function ZonesMap({
             strokeOpacity: 0,
             clickable: false,
             zIndex: 1,
+          }}
+        />
+        <PolygonF
+          paths={MOROCCO_SOUTH_REGION_MASK_PATH}
+          options={{
+            fillColor: MOROCCO_SOUTH_REGION_MASK_FILL,
+            fillOpacity: 0.96,
+            strokeOpacity: 0,
+            clickable: false,
+            zIndex: 2,
           }}
         />
         <MarkerClustererF
