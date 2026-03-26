@@ -20,6 +20,7 @@ import { ApiError } from "../middlewares/error.middleware.js";
 import { ListingRepository, type ListingWithRelations } from "../repositories/listing.repository.js";
 import { ZoneRepository } from "../repositories/zone.repository.js";
 import { deriveSellerCompanyName, deriveSellerDisplayName } from "./seller-public.utils.js";
+import { normalizeMediaUrls } from "../utils/media-url.js";
 
 const toPrismaType = (value: ListingPropertyType): PrismaListingType => {
   if (value === "house") return "HOUSE";
@@ -72,10 +73,7 @@ const fromPrismaSourcePlatform = (
 };
 
 const safeImageUrls = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter((item) => item.length > 0);
+  return normalizeMediaUrls(value);
 };
 
 const cleanOptionalText = (value: string | undefined): string | undefined => {

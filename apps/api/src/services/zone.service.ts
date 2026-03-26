@@ -13,6 +13,7 @@ import { ZoneRepository } from "../repositories/zone.repository.js";
 import { ListingRepository, type ListingWithRelations } from "../repositories/listing.repository.js";
 import { DEFAULT_PROFILE } from "./default-profile.js";
 import { fromPrismaMetrics } from "./mappers.js";
+import { normalizeMediaUrl, normalizeMediaUrls } from "../utils/media-url.js";
 
 type CountKey = keyof Omit<ListingTypeCounts, "total">;
 
@@ -70,14 +71,6 @@ export class ZoneService {
   private readonly zoneRepository = new ZoneRepository();
   private readonly listingRepository = new ListingRepository();
 
-  private asText(value: unknown): string | undefined {
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      return trimmed.length ? trimmed : undefined;
-    }
-    return undefined;
-  }
-
   private toHostname(value: string): string | undefined {
     try {
       return new URL(value).hostname.toLowerCase();
@@ -87,9 +80,13 @@ export class ZoneService {
   }
 
   private sanitizeImageUrl(value: unknown): string | undefined {
-    const text = this.asText(value);
-    if (!text || !/^https?:\/\//i.test(text)) {
+    const text = normalizeMediaUrl(value);
+    if (!text) {
       return undefined;
+    }
+
+    if (text.startsWith("/uploads/")) {
+      return text;
     }
 
     const lower = text.toLowerCase();
@@ -248,11 +245,7 @@ export class ZoneService {
   }
 
   private toPropertyListing(listing: ListingWithRelations): PropertyListing {
-    const imageUrls = Array.isArray(listing.imageUrls)
-      ? listing.imageUrls
-          .map((item) => (typeof item === "string" ? item.trim() : ""))
-          .filter((item) => item.length > 0)
-      : [];
+    const imageUrls = normalizeMediaUrls(listing.imageUrls);
 
     return {
       id: listing.id,

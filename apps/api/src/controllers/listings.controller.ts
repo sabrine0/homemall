@@ -9,6 +9,7 @@ import type { Request, Response } from "express";
 import { ApiError } from "../middlewares/error.middleware.js";
 import { ChatService } from "../services/chat.service.js";
 import { ListingService } from "../services/listing.service.js";
+import { normalizeMediaUrl } from "../utils/media-url.js";
 
 const listingService = new ListingService();
 const chatService = new ChatService();
@@ -31,7 +32,9 @@ export const uploadListingMedia = async (
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   res.status(201).json({
     files: files.map((file) => ({
-      url: `${baseUrl}/uploads/listings/${file.filename}`,
+      url:
+        normalizeMediaUrl(`${baseUrl}/uploads/listings/${file.filename}`) ??
+        `/uploads/listings/${file.filename}`,
       mimeType: file.mimetype,
       originalName: file.originalname,
       sizeBytes: file.size,
