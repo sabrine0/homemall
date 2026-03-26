@@ -43,6 +43,27 @@ const maxUploadFileSizeBytes = 15 * 1024 * 1024;
 const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 const googleMapsRegion = "MA";
 const googleMapsPlacesLibraries = ["places"] as ("places")[];
+const fallbackMoroccoPlaces: ListingZoneDraft[] = [
+  { name: "Casablanca", city: "Casablanca", centerLat: 33.5731, centerLng: -7.5898 },
+  { name: "Rabat", city: "Rabat", centerLat: 34.0209, centerLng: -6.8416 },
+  { name: "Sale", city: "Sale", centerLat: 34.0372, centerLng: -6.7985 },
+  { name: "Marrakech", city: "Marrakech", centerLat: 31.6295, centerLng: -7.9811 },
+  { name: "Tangier", city: "Tangier", centerLat: 35.7595, centerLng: -5.834 },
+  { name: "Agadir", city: "Agadir", centerLat: 30.4278, centerLng: -9.5981 },
+  { name: "Fes", city: "Fes", centerLat: 34.0331, centerLng: -5.0003 },
+  { name: "Meknes", city: "Meknes", centerLat: 33.8731, centerLng: -5.5407 },
+  { name: "Oujda", city: "Oujda", centerLat: 34.6814, centerLng: -1.9086 },
+  { name: "Kenitra", city: "Kenitra", centerLat: 34.261, centerLng: -6.5802 },
+  { name: "Temara", city: "Temara", centerLat: 33.9287, centerLng: -6.9066 },
+  { name: "El Jadida", city: "El Jadida", centerLat: 33.2316, centerLng: -8.5007 },
+  { name: "Mohammedia", city: "Mohammedia", centerLat: 33.6874, centerLng: -7.382 },
+  { name: "Tetouan", city: "Tetouan", centerLat: 35.5889, centerLng: -5.3626 },
+  { name: "Nador", city: "Nador", centerLat: 35.1688, centerLng: -2.9335 },
+  { name: "Beni Mellal", city: "Beni Mellal", centerLat: 32.3373, centerLng: -6.3498 },
+  { name: "Ouarzazate", city: "Ouarzazate", centerLat: 30.9335, centerLng: -6.937 },
+  { name: "Dakhla", city: "Dakhla", centerLat: 23.6848, centerLng: -15.957 },
+  { name: "Laayoune", city: "Laayoune", centerLat: 27.1536, centerLng: -13.2033 },
+];
 
 type ZoneSuggestion =
   | {
@@ -200,6 +221,7 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     [locale, selectedZone],
   );
   const zoneSuggestions = useMemo(() => {
+    const query = normalizeSearchText(zoneQuery);
     const zoneMatches = zones
       .map((zone) => {
         const localizedZoneName = getLocalizedZoneName(zone.name, zone.city, locale);
@@ -217,7 +239,6 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
         };
       })
       .filter((option) => {
-        const query = normalizeSearchText(zoneQuery);
         return query.length === 0 || option.searchText.includes(query);
       })
       .slice(0, 8);
@@ -237,7 +258,34 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
       return true;
     });
 
-    return [...zoneMatches, ...googleMatches].slice(0, 8);
+    const fallbackMatches = fallbackMoroccoPlaces
+      .map((place) => ({
+        kind: "google" as const,
+        key: `fallback-${normalizeSearchText(`${place.name}-${place.city}`)}`,
+        label: place.name,
+        detail: `${place.city}, Morocco`,
+        zoneDraft: place,
+        searchText: normalizeSearchText(`${place.name} ${place.city}`),
+      }))
+      .filter((option) => {
+        if (query.length === 0) {
+          return false;
+        }
+
+        if (!option.searchText.includes(query)) {
+          return false;
+        }
+
+        const key = normalizeSearchText(option.label);
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+
+    return [...zoneMatches, ...googleMatches, ...fallbackMatches].slice(0, 8);
   }, [googleSuggestions, locale, zoneQuery, zones]);
   const activeZoneSuggestion =
     zoneSuggestions[activeZoneSuggestionIndex] ?? zoneSuggestions[0];
