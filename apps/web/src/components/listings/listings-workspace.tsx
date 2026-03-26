@@ -58,7 +58,8 @@ type ZoneSuggestion =
       key: string;
       label: string;
       detail: string;
-      placeId: string;
+      placeId?: string;
+      zoneDraft?: ListingZoneDraft;
       searchText: string;
     };
 
@@ -175,6 +176,7 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const zoneAutocompleteServiceRef = useRef<any>(null);
   const zonePlacesServiceRef = useRef<any>(null);
+  const zoneGeocoderRef = useRef<any>(null);
   const zoneBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const googleMapsLanguage = getGoogleMapsLanguage(locale);
@@ -283,7 +285,16 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
 
   useEffect(() => {
     const googleMaps = (window as { google?: any }).google;
-    if (!isGooglePlacesLoaded || !googleMaps?.maps?.places) {
+    if (!isGooglePlacesLoaded || !googleMaps?.maps) {
+      zoneAutocompleteServiceRef.current = null;
+      zonePlacesServiceRef.current = null;
+      zoneGeocoderRef.current = null;
+      return;
+    }
+
+    zoneGeocoderRef.current = new googleMaps.maps.Geocoder();
+
+    if (!googleMaps.maps.places) {
       zoneAutocompleteServiceRef.current = null;
       zonePlacesServiceRef.current = null;
       return;
@@ -322,7 +333,7 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     if (
       query.length < 2 ||
       !googleMapsApiKey ||
-      !zoneAutocompleteServiceRef.current
+      (!zoneAutocompleteServiceRef.current && !zoneGeocoderRef.current)
     ) {
       setGoogleSuggestions([]);
       setLoadingZoneSuggestions(false);
@@ -333,6 +344,73 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     const timer = setTimeout(() => {
       setLoadingZoneSuggestions(true);
 
+      const applyGeocoderFallback = () => {
+        if (!zoneGeocoderRef.current) {
+          setGoogleSuggestions([]);
+          setLoadingZoneSuggestions(false);
+          return;
+        }
+
+        zoneGeocoderRef.current.geocode(
+          {
+            address: query,
+            componentRestrictions: { country: "MA" },
+            region: googleMapsRegion,
+          },
+          (results: any[] | null, status: any) => {
+            if (cancelled) {
+              return;
+            }
+
+            const okStatus =
+              (window as { google?: any }).google?.maps?.GeocoderStatus?.OK ?? "OK";
+            if (status !== "OK" && status !== okStatus) {
+              setGoogleSuggestions([]);
+              setLoadingZoneSuggestions(false);
+              return;
+            }
+
+            setGoogleSuggestions(
+              (results ?? []).slice(0, 6).map((result) => {
+                const city =
+                  firstAddressComponent(result.address_components, [
+                    "locality",
+                    "administrative_area_level_2",
+                    "administrative_area_level_1",
+                  ]) ??
+                  "Morocco";
+                const zoneDraft: ListingZoneDraft = {
+                  name: (result.address_components?.[0]?.long_name || result.formatted_address || query).trim().slice(0, 140),
+                  city: city.trim().slice(0, 120),
+                  centerLat: result.geometry.location.lat(),
+                  centerLng: result.geometry.location.lng(),
+                  formattedAddress: result.formatted_address?.trim() || undefined,
+                  googlePlaceId: result.place_id?.trim() || undefined,
+                };
+
+                return {
+                  kind: "google" as const,
+                  key: result.place_id || result.formatted_address || `${zoneDraft.name}-${zoneDraft.city}`,
+                  label: zoneDraft.name,
+                  detail: result.formatted_address || `${zoneDraft.city}, Morocco`,
+                  placeId: result.place_id || undefined,
+                  zoneDraft,
+                  searchText: normalizeSearchText(
+                    result.formatted_address || `${zoneDraft.name} ${zoneDraft.city}`,
+                  ),
+                };
+              }),
+            );
+            setLoadingZoneSuggestions(false);
+          },
+        );
+      };
+
+      if (!zoneAutocompleteServiceRef.current) {
+        applyGeocoderFallback();
+        return;
+      }
+
       zoneAutocompleteServiceRef.current.getPlacePredictions(
         {
           input: query,
@@ -340,13 +418,25 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
           region: googleMapsRegion,
           language: googleMapsLanguage,
         },
-        (predictions: any[] | null) => {
+        (predictions: any[] | null, status: any) => {
           if (cancelled) {
             return;
           }
 
+          const okStatus =
+            (window as { google?: any }).google?.maps?.places?.PlacesServiceStatus?.OK ?? "OK";
+          if (status !== "OK" && status !== okStatus) {
+            applyGeocoderFallback();
+            return;
+          }
+
+          if (!predictions?.length) {
+            applyGeocoderFallback();
+            return;
+          }
+
           setGoogleSuggestions(
-            (predictions ?? []).map((prediction) => ({
+            predictions.map((prediction) => ({
               kind: "google" as const,
               key: prediction.place_id,
               label:
@@ -386,6 +476,26 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
   };
 
   const resolveGoogleZoneDraft = async (suggestion: Extract<ZoneSuggestion, { kind: "google" }>) => {
+    if (suggestion.zoneDraft) {
+      const matchingZone = zones.find(
+        (zone) =>
+          normalizeSearchText(zone.name) === normalizeSearchText(suggestion.zoneDraft!.name) &&
+          normalizeSearchText(zone.city) === normalizeSearchText(suggestion.zoneDraft!.city),
+      );
+
+      if (matchingZone) {
+        selectExistingZone(matchingZone);
+        return;
+      }
+
+      setZoneId("");
+      setZoneDraft(suggestion.zoneDraft);
+      setZoneQuery(formatZoneDraftLabel(suggestion.zoneDraft));
+      setZoneMenuOpen(false);
+      setFeedback(null);
+      return;
+    }
+
     if (!zonePlacesServiceRef.current) {
       setFeedback("Google location search is not ready yet.");
       return;
