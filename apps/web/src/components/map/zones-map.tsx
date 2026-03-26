@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   GoogleMap,
@@ -19,6 +18,7 @@ import type {
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { getScoreRange, getScoreTierInfo } from "@/lib/score-tier";
 import { getLocalizedCityName, getLocalizedZoneName } from "@/lib/location-labels";
+import { buildGoogleMapsUrl } from "@/lib/media";
 import {
   MOROCCO_BOUNDS,
   MOROCCO_CENTER,
@@ -26,7 +26,6 @@ import {
   MOROCCO_OUTLINE_PATH,
   WORLD_MASK_PATH,
 } from "./morocco-map-geometry";
-import type { LeafletMarkerModel } from "./zones-map-leaflet";
 
 interface ZonesMapProps {
   zones: ZoneSummary[];
@@ -55,19 +54,6 @@ type MarkerModel = {
   popupTitle: string;
   highlightedPrice?: number;
 };
-
-const LeafletZonesMap = dynamic(
-  () =>
-    import("./zones-map-leaflet").then((module) => module.ZonesMapLeaflet),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-[52vh] min-h-[340px] w-full items-center justify-center rounded-3xl border border-brand-200 bg-[#edf3f0] px-6 text-sm text-slate-600 shadow-panel">
-        Loading map...
-      </div>
-    ),
-  },
-);
 
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
 
@@ -282,6 +268,35 @@ const getGoogleMapsLanguage = (locale: string) => {
   return "en";
 };
 
+const buildGoogleMapsEmbedUrl = ({
+  lat,
+  lng,
+  label,
+  zoom,
+  locale,
+}: {
+  lat: number;
+  lng: number;
+  label?: string;
+  zoom: number;
+  locale: string;
+}) => {
+  const query = label?.trim()
+    ? `${lat},${lng} (${label.trim()})`
+    : `${lat},${lng}`;
+  const url = new URL("https://www.google.com/maps");
+  url.searchParams.set("q", query);
+  url.searchParams.set("z", String(zoom));
+  url.searchParams.set("output", "embed");
+
+  const language = getGoogleMapsLanguage(locale);
+  if (language) {
+    url.searchParams.set("hl", language);
+  }
+
+  return url.toString();
+};
+
 const MAP_POLITICAL_HIDE_STYLES = [
   {
     featureType: "administrative",
@@ -421,29 +436,70 @@ export function ZonesMap({
   const openPopupMarker = openPopupZoneId
     ? markerByZoneId.get(openPopupZoneId)
     : undefined;
+  const googleMapsFallback = useMemo(() => {
+    const selectedMarker = selectedZoneId
+      ? markerModels.find((item) => item.zone.id === selectedZoneId)
+      : undefined;
+    const focusedMarker = selectedMarker ?? markerModels[0];
+
+    if (focusedMarker) {
+      const label = `${focusedMarker.displayZoneName}, ${focusedMarker.displayCity}`;
+      return {
+        embedUrl: buildGoogleMapsEmbedUrl({
+          lat: focusedMarker.zone.centerLat,
+          lng: focusedMarker.zone.centerLng,
+          label,
+          zoom: markerModels.length === 1 ? 11 : 8,
+          locale,
+        }),
+        openUrl:
+          buildGoogleMapsUrl(
+            focusedMarker.zone.centerLat,
+            focusedMarker.zone.centerLng,
+            label,
+            locale,
+          ) ?? "https://www.google.com/maps",
+      };
+    }
+
+    return {
+      embedUrl: buildGoogleMapsEmbedUrl({
+        lat: MOROCCO_CENTER.lat,
+        lng: MOROCCO_CENTER.lng,
+        label: "Morocco",
+        zoom: 6,
+        locale,
+      }),
+      openUrl:
+        buildGoogleMapsUrl(
+          MOROCCO_CENTER.lat,
+          MOROCCO_CENTER.lng,
+          "Morocco",
+          locale,
+        ) ?? "https://www.google.com/maps",
+    };
+  }, [locale, markerModels, selectedZoneId]);
 
   if (!googleMapsApiKey || loadError) {
     return (
-      <LeafletZonesMap
-        markerModels={markerModels as LeafletMarkerModel[]}
-        selectedZoneId={selectedZoneId}
-        locale={locale}
-        purposeLabel={
-          purpose === "rent"
-            ? t("listing.rent")
-            : purpose === "buy"
-              ? t("listing.sale")
-              : t("listing.total")
-        }
-        scoreLabel={t("common.score")}
-        tierLabels={{
-          best: t("tier.best"),
-          medium: t("tier.medium"),
-          worst: t("tier.worst"),
-        }}
-        listingTypeLabel={(type) => t(`listing.${type}` as never)}
-        onSelectZone={onSelectZone}
-      />
+      <div className="relative h-[52vh] min-h-[340px] w-full overflow-hidden rounded-3xl border border-brand-200 bg-[#edf3f0] shadow-panel">
+        <iframe
+          title="Google Maps"
+          src={googleMapsFallback.embedUrl}
+          className="h-full w-full border-0"
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
+        <a
+          href={googleMapsFallback.openUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute bottom-3 right-3 rounded-full bg-white/92 px-4 py-2 text-xs font-semibold text-brand-900 shadow-panel"
+        >
+          Open in Google Maps
+        </a>
+      </div>
     );
   }
 
