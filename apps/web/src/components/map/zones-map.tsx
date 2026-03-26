@@ -6,7 +6,6 @@ import {
   InfoWindowF,
   MarkerClustererF,
   MarkerF,
-  PolygonF,
   useJsApiLoader,
 } from "@react-google-maps/api";
 import type {
@@ -18,15 +17,11 @@ import type {
 import { useI18n } from "@/components/i18n/i18n-provider";
 import { getScoreRange, getScoreTierInfo } from "@/lib/score-tier";
 import { getLocalizedCityName, getLocalizedZoneName } from "@/lib/location-labels";
-import { buildGoogleMapsUrl } from "@/lib/media";
 import {
   MOROCCO_BOUNDS,
   MOROCCO_CENTER,
-  MOROCCO_MAP_MASK_FILL,
-  MOROCCO_OUTLINE_PATH,
-  MOROCCO_SOUTH_REGION_MASK_FILL,
-  MOROCCO_SOUTH_REGION_MASK_PATH,
-  WORLD_MASK_PATH,
+  MOROCCO_EMPTY_VIEW_CENTER,
+  MOROCCO_EMPTY_VIEW_ZOOM,
 } from "./morocco-map-geometry";
 
 interface ZonesMapProps {
@@ -406,12 +401,8 @@ export function ZonesMap({
 
     const map = mapRef.current;
     if (markerModels.length === 0) {
-      const fallbackBounds = new gmaps.maps.LatLngBounds(
-        { lat: MOROCCO_BOUNDS.south, lng: MOROCCO_BOUNDS.west },
-        { lat: MOROCCO_BOUNDS.north, lng: MOROCCO_BOUNDS.east },
-      );
-      map.fitBounds(fallbackBounds);
-      map.setZoom(6);
+      map.setCenter(MOROCCO_EMPTY_VIEW_CENTER);
+      map.setZoom(MOROCCO_EMPTY_VIEW_ZOOM);
       return;
     }
 
@@ -439,7 +430,6 @@ export function ZonesMap({
   const openPopupMarker = openPopupZoneId
     ? markerByZoneId.get(openPopupZoneId)
     : undefined;
-  const showGoogleFallbackSouthMask = markerModels.length === 0;
   const googleMapsFallback = useMemo(() => {
     const selectedMarker = selectedZoneId
       ? markerModels.find((item) => item.zone.id === selectedZoneId)
@@ -456,30 +446,16 @@ export function ZonesMap({
           zoom: markerModels.length === 1 ? 11 : 8,
           locale,
         }),
-        openUrl:
-          buildGoogleMapsUrl(
-            focusedMarker.zone.centerLat,
-            focusedMarker.zone.centerLng,
-            label,
-            locale,
-          ) ?? "https://www.google.com/maps",
       };
     }
 
     return {
       embedUrl: buildGoogleMapsEmbedUrl({
-        lat: MOROCCO_CENTER.lat,
-        lng: MOROCCO_CENTER.lng,
-        zoom: 6,
+        lat: MOROCCO_EMPTY_VIEW_CENTER.lat,
+        lng: MOROCCO_EMPTY_VIEW_CENTER.lng,
+        zoom: MOROCCO_EMPTY_VIEW_ZOOM,
         locale,
       }),
-      openUrl:
-        buildGoogleMapsUrl(
-          MOROCCO_CENTER.lat,
-          MOROCCO_CENTER.lng,
-          undefined,
-          locale,
-        ) ?? "https://www.google.com/maps",
     };
   }, [locale, markerModels, selectedZoneId]);
 
@@ -494,42 +470,6 @@ export function ZonesMap({
           referrerPolicy="no-referrer-when-downgrade"
           allowFullScreen
         />
-        {showGoogleFallbackSouthMask ? (
-          <div className="pointer-events-none absolute inset-0">
-            <div
-              className="absolute"
-              style={{
-                left: "6%",
-                top: "50%",
-                width: "48%",
-                height: "40%",
-                backgroundColor: MOROCCO_SOUTH_REGION_MASK_FILL,
-                opacity: 0.96,
-                clipPath: "polygon(0 0, 90% 0, 100% 64%, 82% 100%, 0 100%)",
-              }}
-            />
-            <div
-              className="absolute"
-              style={{
-                left: "20%",
-                top: "13%",
-                width: "48%",
-                height: "11%",
-                backgroundColor: MOROCCO_SOUTH_REGION_MASK_FILL,
-                opacity: 0.96,
-                clipPath: "polygon(0 68%, 100% 0, 100% 42%, 0 100%)",
-              }}
-            />
-          </div>
-        ) : null}
-        <a
-          href={googleMapsFallback.openUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="absolute bottom-3 right-3 rounded-full bg-white/92 px-4 py-2 text-xs font-semibold text-brand-900 shadow-panel"
-        >
-          Open in Google Maps
-        </a>
       </div>
     );
   }
@@ -570,26 +510,6 @@ export function ZonesMap({
           },
         }}
       >
-        <PolygonF
-          paths={[WORLD_MASK_PATH, [...MOROCCO_OUTLINE_PATH].reverse()]}
-          options={{
-            fillColor: MOROCCO_MAP_MASK_FILL,
-            fillOpacity: 0.92,
-            strokeOpacity: 0,
-            clickable: false,
-            zIndex: 1,
-          }}
-        />
-        <PolygonF
-          paths={MOROCCO_SOUTH_REGION_MASK_PATH}
-          options={{
-            fillColor: MOROCCO_SOUTH_REGION_MASK_FILL,
-            fillOpacity: 0.96,
-            strokeOpacity: 0,
-            clickable: false,
-            zIndex: 2,
-          }}
-        />
         <MarkerClustererF
           options={{
             maxZoom: 14,
