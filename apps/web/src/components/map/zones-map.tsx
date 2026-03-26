@@ -283,13 +283,14 @@ const buildGoogleMapsEmbedUrl = ({
   zoom: number;
   locale: string;
 }) => {
-  const query = label?.trim()
-    ? `${lat},${lng} (${label.trim()})`
-    : `${lat},${lng}`;
   const url = new URL("https://www.google.com/maps");
-  url.searchParams.set("q", query);
+  url.searchParams.set("ll", `${lat},${lng}`);
   url.searchParams.set("z", String(zoom));
   url.searchParams.set("output", "embed");
+
+  if (label?.trim()) {
+    url.searchParams.set("q", `${lat},${lng} (${label.trim()})`);
+  }
 
   const language = getGoogleMapsLanguage(locale);
   if (language) {
@@ -438,6 +439,7 @@ export function ZonesMap({
   const openPopupMarker = openPopupZoneId
     ? markerByZoneId.get(openPopupZoneId)
     : undefined;
+  const showGoogleFallbackSouthMask = markerModels.length === 0;
   const googleMapsFallback = useMemo(() => {
     const selectedMarker = selectedZoneId
       ? markerModels.find((item) => item.zone.id === selectedZoneId)
@@ -468,7 +470,6 @@ export function ZonesMap({
       embedUrl: buildGoogleMapsEmbedUrl({
         lat: MOROCCO_CENTER.lat,
         lng: MOROCCO_CENTER.lng,
-        label: "Morocco",
         zoom: 6,
         locale,
       }),
@@ -476,7 +477,7 @@ export function ZonesMap({
         buildGoogleMapsUrl(
           MOROCCO_CENTER.lat,
           MOROCCO_CENTER.lng,
-          "Morocco",
+          undefined,
           locale,
         ) ?? "https://www.google.com/maps",
     };
@@ -493,6 +494,34 @@ export function ZonesMap({
           referrerPolicy="no-referrer-when-downgrade"
           allowFullScreen
         />
+        {showGoogleFallbackSouthMask ? (
+          <div className="pointer-events-none absolute inset-0">
+            <div
+              className="absolute"
+              style={{
+                left: "6%",
+                top: "50%",
+                width: "48%",
+                height: "40%",
+                backgroundColor: MOROCCO_SOUTH_REGION_MASK_FILL,
+                opacity: 0.96,
+                clipPath: "polygon(0 0, 90% 0, 100% 64%, 82% 100%, 0 100%)",
+              }}
+            />
+            <div
+              className="absolute"
+              style={{
+                left: "20%",
+                top: "13%",
+                width: "48%",
+                height: "11%",
+                backgroundColor: MOROCCO_SOUTH_REGION_MASK_FILL,
+                opacity: 0.96,
+                clipPath: "polygon(0 68%, 100% 0, 100% 42%, 0 100%)",
+              }}
+            />
+          </div>
+        ) : null}
         <a
           href={googleMapsFallback.openUrl}
           target="_blank"
