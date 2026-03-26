@@ -98,21 +98,6 @@ export function ZoneDetailsTabs({
     () => buildMapFallback(zone.centerLat, zone.centerLng),
     [zone.centerLat, zone.centerLng],
   );
-
-  const galleryImages = useMemo(() => {
-    const fromZone = Array.isArray(zone.imageUrls)
-      ? zone.imageUrls.filter(
-          (item): item is string =>
-            typeof item === "string" && item.trim().length > 0,
-        )
-      : [];
-    const lead = zone.imageUrl?.trim() ? [zone.imageUrl.trim()] : [];
-    const merged = Array.from(new Set([...lead, ...fromZone]));
-    return merged.length ? merged : [fallbackMapImage];
-  }, [fallbackMapImage, zone.imageUrl, zone.imageUrls]);
-
-  const zoneImageUrl = galleryImages[0];
-  const [selectedImage, setSelectedImage] = useState(zoneImageUrl);
   const isRtl = locale === "ar";
   const displayCity = getLocalizedCityName(zone.city, locale);
   const displayZoneName = getLocalizedZoneName(zone.name, zone.city, locale);
@@ -126,10 +111,6 @@ export function ZoneDetailsTabs({
       ),
     [displayCity, displayZoneName, locale, zone.centerLat, zone.centerLng],
   );
-
-  useEffect(() => {
-    setSelectedImage(zoneImageUrl);
-  }, [zoneImageUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,49 +288,8 @@ export function ZoneDetailsTabs({
 
   return (
     <section className="space-y-5">
-      <Card className="overflow-hidden rounded-3xl p-0">
-        <div className="relative aspect-[16/7] w-full overflow-hidden bg-brand-100">
-          <img
-            src={selectedImage}
-            alt={`${displayZoneName} in ${displayCity}`}
-            className="h-full w-full object-cover object-center"
-            loading="eager"
-            onError={(event) => {
-              if (event.currentTarget.src !== fallbackMapImage) {
-                event.currentTarget.src = fallbackMapImage;
-              }
-            }}
-          />
-        </div>
-        {galleryImages.length > 1 ? (
-          <div className="grid grid-cols-4 gap-2 border-b border-brand-100 bg-brand-50/80 p-3 md:grid-cols-5">
-            {galleryImages.slice(0, 5).map((image, index) => (
-              <button
-                key={`${image}_${index}`}
-                type="button"
-                onClick={() => setSelectedImage(image)}
-                className={`overflow-hidden rounded-xl border-2 transition ${
-                  selectedImage === image
-                    ? "border-brand-700"
-                    : "border-transparent hover:border-brand-300"
-                }`}
-                aria-label={`Show photo ${index + 1} for ${displayZoneName}`}
-              >
-                <img
-                  src={image}
-                  alt={`${displayZoneName} photo ${index + 1}`}
-                  className="h-20 w-full object-cover object-center"
-                  loading="lazy"
-                  onError={(event) => {
-                    event.currentTarget.src = fallbackMapImage;
-                  }}
-                />
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="space-y-4 p-5">
+      <Card className="rounded-3xl p-5">
+        <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className={isRtl ? "text-right" : undefined}>
               <p className="text-sm text-brand-600">{displayCity}</p>
