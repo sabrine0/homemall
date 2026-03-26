@@ -81,6 +81,19 @@ const cleanOptionalText = (value: string | undefined): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+const defaultZoneMetrics = () => ({
+  noiseIndex: 55,
+  greenIndex: 52,
+  airQualityIndex: 58,
+  pollenIndex: 46,
+  floodRiskIndex: 32,
+  heatIndex: 50,
+  transitIndex: 56,
+  walkIndex: 54,
+  futureValueIndex: 57,
+  zoningRiskIndex: 34
+});
+
 export class ListingService {
   private readonly listingRepository = new ListingRepository();
   private readonly zoneRepository = new ZoneRepository();
@@ -138,15 +151,57 @@ export class ListingService {
     };
   }
 
-  async create(sellerId: string, input: CreateListingInputDto): Promise<ListingOffer> {
-    const zoneExists = await this.zoneRepository.existsById(input.zoneId);
-    if (!zoneExists) {
-      throw new ApiError(404, "Zone not found");
+  private async resolveZoneId(input: CreateListingInputDto): Promise<string> {
+    if (input.zoneId) {
+      const zoneExists = await this.zoneRepository.existsById(input.zoneId);
+      if (!zoneExists) {
+        throw new ApiError(404, "Zone not found");
+      }
+
+      return input.zoneId;
     }
+
+    const zoneDraft = input.zoneDraft;
+    if (!zoneDraft) {
+      throw new ApiError(400, "Please choose a zone");
+    }
+
+    const zoneName = zoneDraft.name.trim();
+    const zoneCity = zoneDraft.city.trim();
+    const existingZone = await this.zoneRepository.findByNameCity(
+      zoneName,
+      zoneCity
+    );
+    if (existingZone) {
+      return existingZone.id;
+    }
+
+    const createdZone = await this.zoneRepository.create({
+      name: zoneName,
+      city: zoneCity,
+      centerLat: zoneDraft.centerLat,
+      centerLng: zoneDraft.centerLng,
+      metaJson: {
+        source: "google_places",
+        ...(cleanOptionalText(zoneDraft.formattedAddress)
+          ? { formattedAddress: cleanOptionalText(zoneDraft.formattedAddress) }
+          : {}),
+        ...(cleanOptionalText(zoneDraft.googlePlaceId)
+          ? { googlePlaceId: cleanOptionalText(zoneDraft.googlePlaceId) }
+          : {})
+      },
+      metrics: defaultZoneMetrics()
+    });
+
+    return createdZone.id;
+  }
+
+  async create(sellerId: string, input: CreateListingInputDto): Promise<ListingOffer> {
+    const zoneId = await this.resolveZoneId(input);
 
     const listing = await this.listingRepository.create({
       sellerId,
-      zoneId: input.zoneId,
+      zoneId,
       title: input.title.trim(),
       description: input.description?.trim() || undefined,
       type: toPrismaType(input.type),

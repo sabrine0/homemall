@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useJsApiLoader } from "@react-google-maps/api";
 import type {
   CreateListingInput,
   ListingOffer,
   ListingPropertyType,
+  ListingZoneDraft,
   ListingPurpose,
   UpdateListingInput,
   UploadListingMediaResponse,
@@ -18,6 +20,7 @@ import { Button, buttonClassName } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { clientApi } from "@/lib/client-api";
 import { formatCurrency } from "@/lib/format";
+import { getLocalizedCityName, getLocalizedZoneName } from "@/lib/location-labels";
 import { buildGoogleMapsUrl, getListingMediaUrls } from "@/lib/media";
 
 interface ListingsWorkspaceProps {
@@ -37,6 +40,27 @@ const listingTypes: ListingPropertyType[] = [
 ];
 const maxUploadFiles = 8;
 const maxUploadFileSizeBytes = 15 * 1024 * 1024;
+const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+const googleMapsRegion = "MA";
+const googleMapsPlacesLibraries = ["places"] as ("places")[];
+
+type ZoneSuggestion =
+  | {
+      kind: "existing";
+      key: string;
+      label: string;
+      detail: string;
+      zone: ZoneSummary;
+      searchText: string;
+    }
+  | {
+      kind: "google";
+      key: string;
+      label: string;
+      detail: string;
+      placeId: string;
+      searchText: string;
+    };
 
 const parseNumber = (value: string): number | undefined => {
   const trimmed = value.trim();
@@ -58,8 +82,37 @@ const toValidationMessage = (issue: { path: Array<string | number>; message: str
 const purposeLabel = (purpose: ListingPurpose, t: (key: string) => string) =>
   purpose === "rent" ? t("goal.rent") : t("goal.sell");
 
+const normalizeSearchText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const getGoogleMapsLanguage = (locale: string) => {
+  if (locale === "ar") {
+    return "ar";
+  }
+  if (locale === "fr") {
+    return "fr";
+  }
+  return "en";
+};
+
+const formatZoneDraftLabel = (zoneDraft: ListingZoneDraft) =>
+  `${zoneDraft.name} - ${zoneDraft.city}`;
+
+const firstAddressComponent = (
+  components: Array<{ long_name?: string; types?: string[] }> | undefined,
+  types: string[],
+) =>
+  components?.find((component) =>
+    types.some((type) => component.types?.includes(type)),
+  )?.long_name;
+
 export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
   const { t, locale } = useI18n();
+  const zoneListboxId = useId();
   const [mine, setMine] = useState<ListingOffer[]>([]);
   const [loadingMine, setLoadingMine] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -97,6 +150,13 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
   });
 
   const [zoneId, setZoneId] = useState(zones[0]?.id ?? "");
+  const [zoneDraft, setZoneDraft] = useState<ListingZoneDraft | null>(null);
+  const [zoneQuery, setZoneQuery] = useState("");
+  const [zoneMenuOpen, setZoneMenuOpen] = useState(false);
+  const [activeZoneSuggestionIndex, setActiveZoneSuggestionIndex] = useState(0);
+  const [googleSuggestions, setGoogleSuggestions] = useState<ZoneSuggestion[]>([]);
+  const [loadingZoneSuggestions, setLoadingZoneSuggestions] = useState(false);
+  const [resolvingZonePlace, setResolvingZonePlace] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [purpose, setPurpose] = useState<ListingPurpose>("rent");
@@ -113,11 +173,72 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
   const [contactWebsite, setContactWebsite] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const zoneAutocompleteServiceRef = useRef<any>(null);
+  const zonePlacesServiceRef = useRef<any>(null);
+  const zoneBlurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const googleMapsLanguage = getGoogleMapsLanguage(locale);
+  const { isLoaded: isGooglePlacesLoaded } = useJsApiLoader({
+    id: `homemall-listing-zone-places-${googleMapsLanguage}`,
+    googleMapsApiKey,
+    language: googleMapsLanguage,
+    region: googleMapsRegion,
+    libraries: googleMapsPlacesLibraries,
+  });
 
   const selectedZone = useMemo(
     () => zones.find((zone) => zone.id === zoneId),
     [zoneId, zones],
   );
+  const selectedZoneLabel = useMemo(
+    () =>
+      selectedZone
+        ? `${getLocalizedZoneName(selectedZone.name, selectedZone.city, locale)} - ${getLocalizedCityName(selectedZone.city, locale)}`
+        : "",
+    [locale, selectedZone],
+  );
+  const zoneSuggestions = useMemo(() => {
+    const zoneMatches = zones
+      .map((zone) => {
+        const localizedZoneName = getLocalizedZoneName(zone.name, zone.city, locale);
+        const localizedCityName = getLocalizedCityName(zone.city, locale);
+        const label = `${localizedZoneName} - ${localizedCityName}`;
+        const detail = zone.city;
+
+        return {
+          kind: "existing" as const,
+          key: zone.id,
+          label,
+          detail,
+          zone,
+          searchText: normalizeSearchText(`${localizedZoneName} ${localizedCityName} ${zone.name} ${zone.city}`),
+        };
+      })
+      .filter((option) => {
+        const query = normalizeSearchText(zoneQuery);
+        return query.length === 0 || option.searchText.includes(query);
+      })
+      .slice(0, 8);
+
+    const seen = new Set(zoneMatches.map((option) => normalizeSearchText(option.label)));
+    const googleMatches = googleSuggestions.filter((option) => {
+      if (option.kind !== "google") {
+        return false;
+      }
+
+      const key = normalizeSearchText(option.label);
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+
+    return [...zoneMatches, ...googleMatches].slice(0, 8);
+  }, [googleSuggestions, locale, zoneQuery, zones]);
+  const activeZoneSuggestion =
+    zoneSuggestions[activeZoneSuggestionIndex] ?? zoneSuggestions[0];
   const selectedMediaPreviews = useMemo(
     () =>
       selectedFiles.map((file, index) => ({
@@ -131,13 +252,49 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
   const selectedZoneMapUrl = useMemo(
     () =>
       buildGoogleMapsUrl(
-        selectedZone?.centerLat,
-        selectedZone?.centerLng,
-        selectedZone ? `${selectedZone.name}, ${selectedZone.city}` : undefined,
+        selectedZone?.centerLat ?? zoneDraft?.centerLat,
+        selectedZone?.centerLng ?? zoneDraft?.centerLng,
+        selectedZone
+          ? `${selectedZone.name}, ${selectedZone.city}`
+          : zoneDraft
+            ? `${zoneDraft.name}, ${zoneDraft.city}`
+            : undefined,
         locale,
       ),
-    [locale, selectedZone],
+    [locale, selectedZone, zoneDraft],
   );
+
+  useEffect(() => {
+    if (!zoneId && zones[0]) {
+      setZoneId(zones[0].id);
+    }
+  }, [zoneId, zones]);
+
+  useEffect(() => {
+    if (selectedZoneLabel && !zoneMenuOpen) {
+      setZoneQuery(selectedZoneLabel);
+      return;
+    }
+
+    if (!selectedZone && zoneDraft && !zoneMenuOpen) {
+      setZoneQuery(formatZoneDraftLabel(zoneDraft));
+    }
+  }, [selectedZone, selectedZoneLabel, zoneDraft, zoneMenuOpen]);
+
+  useEffect(() => {
+    const googleMaps = (window as { google?: any }).google;
+    if (!isGooglePlacesLoaded || !googleMaps?.maps?.places) {
+      zoneAutocompleteServiceRef.current = null;
+      zonePlacesServiceRef.current = null;
+      return;
+    }
+
+    zoneAutocompleteServiceRef.current =
+      new googleMaps.maps.places.AutocompleteService();
+    zonePlacesServiceRef.current = new googleMaps.maps.places.PlacesService(
+      document.createElement("div"),
+    );
+  }, [isGooglePlacesLoaded]);
 
   useEffect(
     () => () => {
@@ -147,6 +304,175 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     },
     [selectedMediaPreviews],
   );
+
+  useEffect(() => {
+    return () => {
+      if (zoneBlurTimerRef.current) {
+        clearTimeout(zoneBlurTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!zoneMenuOpen) {
+      return;
+    }
+
+    const query = zoneQuery.trim();
+    if (
+      query.length < 2 ||
+      !googleMapsApiKey ||
+      !zoneAutocompleteServiceRef.current
+    ) {
+      setGoogleSuggestions([]);
+      setLoadingZoneSuggestions(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setLoadingZoneSuggestions(true);
+
+      zoneAutocompleteServiceRef.current.getPlacePredictions(
+        {
+          input: query,
+          componentRestrictions: { country: "ma" },
+          region: googleMapsRegion,
+          language: googleMapsLanguage,
+        },
+        (predictions: any[] | null) => {
+          if (cancelled) {
+            return;
+          }
+
+          setGoogleSuggestions(
+            (predictions ?? []).map((prediction) => ({
+              kind: "google" as const,
+              key: prediction.place_id,
+              label:
+                prediction.structured_formatting?.main_text ??
+                prediction.description,
+              detail:
+                prediction.structured_formatting?.secondary_text ??
+                prediction.description,
+              placeId: prediction.place_id,
+              searchText: normalizeSearchText(
+                prediction.description ?? prediction.structured_formatting?.main_text ?? "",
+              ),
+            })),
+          );
+          setLoadingZoneSuggestions(false);
+        },
+      );
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [googleMapsLanguage, zoneMenuOpen, zoneQuery]);
+
+  useEffect(() => {
+    setActiveZoneSuggestionIndex(0);
+  }, [zoneSuggestions.length, zoneQuery]);
+
+  const selectExistingZone = (zone: ZoneSummary) => {
+    const label = `${getLocalizedZoneName(zone.name, zone.city, locale)} - ${getLocalizedCityName(zone.city, locale)}`;
+    setZoneId(zone.id);
+    setZoneDraft(null);
+    setZoneQuery(label);
+    setZoneMenuOpen(false);
+    setFeedback(null);
+  };
+
+  const resolveGoogleZoneDraft = async (suggestion: Extract<ZoneSuggestion, { kind: "google" }>) => {
+    if (!zonePlacesServiceRef.current) {
+      setFeedback("Google location search is not ready yet.");
+      return;
+    }
+
+    setResolvingZonePlace(true);
+    try {
+      const place = await new Promise<any>((resolve, reject) => {
+        zonePlacesServiceRef.current.getDetails(
+          {
+            placeId: suggestion.placeId,
+            fields: [
+              "address_components",
+              "formatted_address",
+              "geometry",
+              "name",
+              "place_id",
+            ],
+          },
+          (result: any, status: any) => {
+            if (
+              status !== "OK" &&
+              status !== (window as { google?: any }).google?.maps?.places?.PlacesServiceStatus?.OK
+            ) {
+              reject(new Error("Could not load that location."));
+              return;
+            }
+
+            if (!result?.geometry?.location) {
+              reject(new Error("That location does not include map coordinates."));
+              return;
+            }
+
+            resolve(result);
+          },
+        );
+      });
+
+      const city =
+        firstAddressComponent(place.address_components, [
+          "locality",
+          "administrative_area_level_2",
+          "administrative_area_level_1",
+        ]) ??
+        suggestion.detail.split(",")[0]?.trim() ??
+        "Morocco";
+      const nextZoneDraft: ListingZoneDraft = {
+        name: (place.name?.trim() || suggestion.label.trim()).slice(0, 140),
+        city: city.slice(0, 120),
+        centerLat: place.geometry.location.lat(),
+        centerLng: place.geometry.location.lng(),
+        formattedAddress: place.formatted_address?.trim() || undefined,
+        googlePlaceId: place.place_id?.trim() || undefined,
+      };
+      const matchingZone = zones.find(
+        (zone) =>
+          normalizeSearchText(zone.name) === normalizeSearchText(nextZoneDraft.name) &&
+          normalizeSearchText(zone.city) === normalizeSearchText(nextZoneDraft.city),
+      );
+
+      if (matchingZone) {
+        selectExistingZone(matchingZone);
+        return;
+      }
+
+      setZoneId("");
+      setZoneDraft(nextZoneDraft);
+      setZoneQuery(formatZoneDraftLabel(nextZoneDraft));
+      setZoneMenuOpen(false);
+      setFeedback(null);
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "Could not use that Google location.",
+      );
+    } finally {
+      setResolvingZonePlace(false);
+    }
+  };
+
+  const handleZoneSuggestionSelect = async (suggestion: ZoneSuggestion) => {
+    if (suggestion.kind === "existing") {
+      selectExistingZone(suggestion.zone);
+      return;
+    }
+
+    await resolveGoogleZoneDraft(suggestion);
+  };
 
   const loadMine = async () => {
     setLoadingMine(true);
@@ -229,8 +555,8 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     setFeedback(null);
 
     try {
-      if (!zoneId) {
-        throw new Error("Please choose a zone.");
+      if (!zoneId && !zoneDraft) {
+        throw new Error("Please choose a zone or Google location.");
       }
       if (!title.trim()) {
         throw new Error("Please add a title.");
@@ -240,7 +566,8 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
       }
 
       const basePayload: CreateListingInput = {
-        zoneId,
+        zoneId: zoneId || undefined,
+        zoneDraft: zoneDraft ?? undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         purpose,
@@ -293,6 +620,7 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
       });
 
       setFeedback("Listing posted successfully.");
+      setZoneDraft(null);
       setTitle("");
       setDescription("");
       setPrice("");
@@ -479,18 +807,122 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-sm text-brand-800">
                 Zone
-                <select
-                  value={zoneId}
-                  onChange={(event) => setZoneId(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-brand-200 px-3 py-2"
-                  required
-                >
-                  {zones.map((zone) => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.name} - {zone.city}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative mt-1">
+                  <input
+                    type="text"
+                    value={zoneQuery}
+                    onFocus={() => setZoneMenuOpen(true)}
+                    onBlur={() => {
+                      zoneBlurTimerRef.current = setTimeout(() => {
+                        setZoneMenuOpen(false);
+                      }, 120);
+                    }}
+                    onChange={(event) => {
+                      setZoneQuery(event.target.value);
+                      setZoneId("");
+                      setZoneDraft(null);
+                      setZoneMenuOpen(true);
+                      setFeedback(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setZoneMenuOpen(true);
+                        setActiveZoneSuggestionIndex((current) =>
+                          zoneSuggestions.length
+                            ? Math.min(current + 1, zoneSuggestions.length - 1)
+                            : 0,
+                        );
+                        return;
+                      }
+
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setActiveZoneSuggestionIndex((current) =>
+                          Math.max(current - 1, 0),
+                        );
+                        return;
+                      }
+
+                      if (event.key === "Enter" && zoneMenuOpen && activeZoneSuggestion) {
+                        event.preventDefault();
+                        void handleZoneSuggestionSelect(activeZoneSuggestion);
+                        return;
+                      }
+
+                      if (event.key === "Escape") {
+                        setZoneMenuOpen(false);
+                      }
+                    }}
+                    placeholder="Start typing a zone, city, or Google Maps place"
+                    autoComplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={zoneMenuOpen}
+                    aria-controls={zoneListboxId}
+                    aria-activedescendant={
+                      zoneMenuOpen && activeZoneSuggestion
+                        ? `${zoneListboxId}-${activeZoneSuggestion.key}`
+                        : undefined
+                    }
+                    className="w-full rounded-xl border border-brand-200 px-3 py-2 outline-none ring-brand-300 focus:ring"
+                    required
+                  />
+                  {zoneMenuOpen ? (
+                    <div
+                      id={zoneListboxId}
+                      role="listbox"
+                      className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-2xl border border-brand-200 bg-white p-2 shadow-panel"
+                    >
+                      {zoneSuggestions.map((suggestion, index) => (
+                        <button
+                          key={suggestion.key}
+                          id={`${zoneListboxId}-${suggestion.key}`}
+                          type="button"
+                          role="option"
+                          aria-selected={activeZoneSuggestionIndex === index}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            void handleZoneSuggestionSelect(suggestion);
+                          }}
+                          className={`flex w-full items-start justify-between gap-3 rounded-xl px-3 py-2 text-left ${
+                            activeZoneSuggestionIndex === index
+                              ? "bg-brand-50 text-brand-900"
+                              : "text-brand-800 hover:bg-brand-50"
+                          }`}
+                        >
+                          <span>
+                            <span className="block text-sm font-semibold">
+                              {suggestion.label}
+                            </span>
+                            <span className="block text-xs text-brand-600">
+                              {suggestion.kind === "google"
+                                ? `${suggestion.detail} • Google Maps`
+                                : suggestion.detail}
+                            </span>
+                          </span>
+                          <span className="rounded-full bg-brand-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-700">
+                            {suggestion.kind === "google" ? "Google" : "Zone"}
+                          </span>
+                        </button>
+                      ))}
+                      {!zoneSuggestions.length ? (
+                        <p className="px-3 py-2 text-sm text-brand-600">
+                          {loadingZoneSuggestions
+                            ? "Searching Google Maps..."
+                            : "No zone or Google Maps match found."}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <span className="mt-2 block text-xs text-brand-600">
+                  {zoneDraft
+                    ? "Google place selected. A zone will be created automatically when you post the listing."
+                    : resolvingZonePlace
+                      ? "Loading Google Maps place details..."
+                      : "Type to filter zones or pick a Google Maps place in Morocco."}
+                </span>
                 {selectedZoneMapUrl ? (
                   <a
                     href={selectedZoneMapUrl}

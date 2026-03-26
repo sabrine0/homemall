@@ -133,10 +133,19 @@ export const listingPurposeSchema = z.enum(["rent", "buy"]);
 export const listingPropertyTypeSchema = z.enum(["apartment", "house", "studio", "villa", "land"]);
 export const listingStatusSchema = z.enum(["active", "paused", "closed"]);
 const listingContactHandleSchema = z.string().trim().min(2).max(200);
+const listingZoneDraftSchema = z.object({
+  name: z.string().trim().min(2).max(140),
+  city: z.string().trim().min(2).max(120),
+  centerLat: z.number(),
+  centerLng: z.number(),
+  formattedAddress: z.string().trim().min(3).max(240).optional(),
+  googlePlaceId: z.string().trim().min(1).max(200).optional()
+});
 
 export const createListingSchema = z
   .object({
-    zoneId: z.string().min(1),
+    zoneId: z.string().min(1).optional(),
+    zoneDraft: listingZoneDraftSchema.optional(),
     title: z.string().min(3).max(140),
     description: z.string().trim().min(5).max(2000).optional(),
     type: listingPropertyTypeSchema,
@@ -155,6 +164,14 @@ export const createListingSchema = z
     contactWebsite: z.string().trim().url().max(2000).optional()
   })
   .superRefine((value, ctx) => {
+    if (!value.zoneId && !value.zoneDraft) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["zoneId"],
+        message: "zoneId or zoneDraft is required"
+      });
+    }
+
     if (value.purpose === "rent" && value.priceMonthly === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

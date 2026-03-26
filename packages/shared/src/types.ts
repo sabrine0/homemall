@@ -257,6 +257,15 @@ export interface ListingOffer extends PropertyListing {
   updatedAt: string;
 }
 
+export interface ListingZoneDraft {
+  name: string;
+  city: string;
+  centerLat: number;
+  centerLng: number;
+  formattedAddress?: string;
+  googlePlaceId?: string;
+}
+
 export type SellerVerificationLevel = "new" | "verified" | "trusted";
 
 export interface SellerProfileStats {
@@ -295,7 +304,8 @@ export interface SellerProfileResponse {
 }
 
 export interface CreateListingInput {
-  zoneId: string;
+  zoneId?: string;
+  zoneDraft?: ListingZoneDraft;
   title: string;
   description?: string;
   type: ListingPropertyType;
