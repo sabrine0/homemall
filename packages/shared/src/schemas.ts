@@ -133,6 +133,17 @@ export const listingPurposeSchema = z.enum(["rent", "buy"]);
 export const listingPropertyTypeSchema = z.enum(["apartment", "house", "studio", "villa", "land"]);
 export const listingStatusSchema = z.enum(["active", "paused", "closed"]);
 const listingContactHandleSchema = z.string().trim().min(2).max(200);
+const listingMediaUrlSchema = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine(
+    (value) =>
+      value.startsWith("/uploads/") || z.string().url().safeParse(value).success,
+    {
+      message: "Invalid url"
+    }
+  );
 const listingZoneDraftSchema = z.object({
   name: z.string().trim().min(2).max(140),
   city: z.string().trim().min(2).max(120),
@@ -155,7 +166,7 @@ export const createListingSchema = z
     areaM2: z.number().positive().max(50000).optional(),
     bedrooms: z.number().int().min(0).max(20).optional(),
     bathrooms: z.number().int().min(0).max(20).optional(),
-    imageUrls: z.array(z.string().url().max(2000)).min(1).max(10),
+    imageUrls: z.array(listingMediaUrlSchema).min(1).max(10),
     contactPhone: z.string().trim().min(6).max(32).optional(),
     contactEmail: z.string().trim().email().max(320).optional(),
     contactWhatsApp: z.string().trim().min(6).max(32).optional(),
@@ -200,7 +211,7 @@ export const updateListingSchema = z
     areaM2: z.number().positive().max(50000).optional(),
     bedrooms: z.number().int().min(0).max(20).optional(),
     bathrooms: z.number().int().min(0).max(20).optional(),
-    imageUrls: z.array(z.string().url().max(2000)).min(1).max(10).optional(),
+    imageUrls: z.array(listingMediaUrlSchema).min(1).max(10).optional(),
     contactPhone: z.string().trim().min(6).max(32).optional(),
     contactEmail: z.string().trim().email().max(320).optional(),
     contactWhatsApp: z.string().trim().min(6).max(32).optional(),
