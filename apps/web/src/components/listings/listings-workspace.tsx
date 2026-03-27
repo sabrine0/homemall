@@ -632,6 +632,46 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     await resolveGoogleZoneDraft(suggestion);
   };
 
+  const resolveTypedZoneSelection = () => {
+    const query = normalizeSearchText(zoneQuery);
+    if (!query) {
+      return { zoneId: "", zoneDraft: null as ListingZoneDraft | null };
+    }
+
+    const exactZone = zones.find((zone) => {
+      const localizedZoneName = getLocalizedZoneName(zone.name, zone.city, locale);
+      const localizedCityName = getLocalizedCityName(zone.city, locale);
+      return [
+        normalizeSearchText(zone.name),
+        normalizeSearchText(zone.city),
+        normalizeSearchText(localizedZoneName),
+        normalizeSearchText(localizedCityName),
+        normalizeSearchText(`${localizedZoneName} - ${localizedCityName}`),
+      ].includes(query);
+    });
+
+    if (exactZone) {
+      return { zoneId: exactZone.id, zoneDraft: null as ListingZoneDraft | null };
+    }
+
+    const fallbackPlace = fallbackMoroccoPlaces.find((place) =>
+      [
+        normalizeSearchText(place.name),
+        normalizeSearchText(place.city),
+        normalizeSearchText(`${place.name} - ${place.city}`),
+      ].includes(query),
+    );
+
+    if (fallbackPlace) {
+      return {
+        zoneId: "",
+        zoneDraft: fallbackPlace,
+      };
+    }
+
+    return { zoneId: "", zoneDraft: null as ListingZoneDraft | null };
+  };
+
   const loadMine = async () => {
     setLoadingMine(true);
     try {
@@ -713,7 +753,16 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
     setFeedback(null);
 
     try {
-      if (!zoneId && !zoneDraft) {
+      let resolvedZoneId = zoneId;
+      let resolvedZoneDraft = zoneDraft;
+
+      if (!resolvedZoneId && !resolvedZoneDraft) {
+        const inferred = resolveTypedZoneSelection();
+        resolvedZoneId = inferred.zoneId;
+        resolvedZoneDraft = inferred.zoneDraft;
+      }
+
+      if (!resolvedZoneId && !resolvedZoneDraft) {
         throw new Error("Please choose a zone or Google location.");
       }
       if (!title.trim()) {
@@ -724,8 +773,8 @@ export function ListingsWorkspace({ zones }: ListingsWorkspaceProps) {
       }
 
       const basePayload: CreateListingInput = {
-        zoneId: zoneId || undefined,
-        zoneDraft: zoneDraft ?? undefined,
+        zoneId: resolvedZoneId || undefined,
+        zoneDraft: resolvedZoneDraft ?? undefined,
         title: title.trim(),
         description: description.trim() || undefined,
         purpose,
