@@ -173,13 +173,14 @@ export function AccountProfileForm({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+  const previewAvatar = avatar.trim() || currentAvatar;
 
   return (
     <form className="mt-4 space-y-3" onSubmit={submit}>
       <div className="flex items-center gap-3">
-        {currentAvatar ? (
+        {previewAvatar ? (
           <img
-            src={currentAvatar}
+            src={previewAvatar}
             alt={currentName || email}
             className="h-14 w-14 rounded-full border border-brand-200 object-cover"
           />

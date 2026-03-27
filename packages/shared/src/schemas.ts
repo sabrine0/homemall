@@ -20,6 +20,22 @@ const optionalProfileUrlSchema = z
     message: "Must be a valid URL"
   });
 
+const optionalProfileAvatarUrlSchema = z
+  .string()
+  .trim()
+  .max(2000)
+  .optional()
+  .refine(
+    (value) =>
+      value === undefined ||
+      value.length === 0 ||
+      value.startsWith("/uploads/") ||
+      z.string().url().safeParse(value).success,
+    {
+      message: "Must be a valid URL"
+    }
+  );
+
 const optionalProfilePhoneSchema = z
   .string()
   .trim()
@@ -71,7 +87,7 @@ export const resetPasswordSchema = z.object({
 export const updateAccountSchema = z
   .object({
     displayName: optionalProfileDisplayNameSchema,
-    avatarUrl: optionalProfileUrlSchema,
+    avatarUrl: optionalProfileAvatarUrlSchema,
     contactPhone: optionalProfilePhoneSchema,
     contactWhatsApp: optionalProfilePhoneSchema,
     contactInstagram: optionalProfileHandleSchema,
