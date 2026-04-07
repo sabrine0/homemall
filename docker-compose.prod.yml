@@ -34,6 +34,7 @@ services:
 
   # ── Backend API ─────────────────────────────────────────────
   api:
+    image: homemall-api-prod:latest
     build:
       context: .
       dockerfile: docker/api.Dockerfile
@@ -66,9 +67,7 @@ services:
   # Shares the same build as api — Docker/Coolify deduplicates the layers.
   # Excluded from Coolify health checks — exits after completion.
   migrate:
-    build:
-      context: .
-      dockerfile: docker/api.Dockerfile
+    image: homemall-api-prod:latest
     restart: "no"
     depends_on:
       db-init:
