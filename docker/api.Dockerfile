@@ -8,7 +8,7 @@ WORKDIR /workspace
 
 COPY . .
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @homemall/api...
 
 RUN pnpm --filter @homemall/shared build \
   && pnpm --filter @homemall/scoring build \

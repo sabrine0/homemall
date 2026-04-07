@@ -18,4 +18,5 @@ apps/api/.env
 apps/api/uploads
 apps/web/.next
 apps/web/.env.local
+apps/mobile
 apps/mobile/build

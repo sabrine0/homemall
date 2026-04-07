@@ -18,7 +18,7 @@ ENV COOKIE_NAME=${COOKIE_NAME}
 
 COPY . .
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @homemall/web...
 
 ENV NODE_OPTIONS="--max-old-space-size=1536"
 
