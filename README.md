@@ -45,6 +45,8 @@ Core backend flows now follow layered boundaries:
 
 Shared contracts and schemas are centralized in `packages/shared` and consumed by API + web + mobile.
 
+Detailed project use cases are documented in `docs/use-cases.md`.
+
 ## Migration Notes
 
 - Audit fields (`createdAt`, `updatedAt`) for `Zone` and `ZoneMetrics` are now included in Prisma migrations.

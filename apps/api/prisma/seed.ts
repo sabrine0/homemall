@@ -70,7 +70,7 @@ const main = async () => {
     where: {
       email: superAdminEmail
     },
-    data: {
+    create: {
       email: superAdminEmail,
       passwordHash: superAdminHash,
       role: "SUPER_ADMIN"
@@ -90,7 +90,7 @@ const main = async () => {
       where: {
         email: managerEmail
       },
-      data: {
+      create: {
         email: managerEmail,
         passwordHash: managerHash,
         role: "MANAGER"
