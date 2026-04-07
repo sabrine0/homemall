@@ -8,6 +8,8 @@
   --bg-top: #f6f4ec;
   --bg-bottom: #dce6df;
   --ink: #18261f;
+  --font-heading: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --font-body: "Avenir Next", "Segoe UI Variable", "Trebuchet MS", sans-serif;
 }
 
 * {
